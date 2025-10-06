@@ -1,6 +1,7 @@
+// src/app/earn/page.js
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const QUEUE_KEY = "scanQueueV1"; // [{code, ts, client_event_id}]
@@ -8,19 +9,20 @@ const RETRY_INTERVAL_MS = 10_000;
 
 function loadQueue() {
   try {
-    const raw = localStorage.getItem(QUEUE_KEY);
+    const raw = typeof window !== "undefined" ? localStorage.getItem(QUEUE_KEY) : null;
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 function saveQueue(q) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  if (typeof window !== "undefined") {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  }
 }
 
 function uuidv4() {
   if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
-  // fallback
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0,
       v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -35,10 +37,11 @@ export default function EarnPage() {
   const [userId, setUserId] = useState(null);
   const retryTimer = useRef(null);
 
+  // ✅ 쿼리에서 부스 코드 파싱 (c 또는 b 모두 지원)
   const searchCode = useMemo(() => {
     if (typeof window === "undefined") return null;
     const u = new URL(window.location.href);
-    return u.searchParams.get("b");
+    return (u.searchParams.get("c") || u.searchParams.get("b")) ?? null;
   }, []);
 
   // 로그인 유저 확인
@@ -64,8 +67,8 @@ export default function EarnPage() {
     if (searchCode) setCode(searchCode);
   }, [searchCode]);
 
-  // 재시도 핸들러
-  const tryFlushQueue = async () => {
+  // ✅ 재시도 핸들러 (useCallback으로 고정)
+  const tryFlushQueue = useCallback(async () => {
     const q = loadQueue();
     if (!q.length || !userId) return;
 
@@ -77,13 +80,12 @@ export default function EarnPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             code: item.code,
-            user_id: userId,
             client_event_id: item.client_event_id,
+            // 서버는 세션의 user_id를 사용하므로 user_id 전달은 필수 아님
           }),
         });
         const json = await res.json();
         if (!json?.ok) {
-          // 그대로 남김
           remain.push(item);
         }
       } catch {
@@ -95,11 +97,12 @@ export default function EarnPage() {
       setStatus("success");
       setMessage("오프라인 큐가 전송되어 활동이 기록됐습니다. /me에서 확인하세요.");
     }
-  };
+  }, [userId, status]);
 
   // 온라인/포커스/주기적 재시도
   useEffect(() => {
     if (!userId) return;
+
     const onOnline = () => tryFlushQueue();
     const onFocus = () => tryFlushQueue();
 
@@ -115,7 +118,7 @@ export default function EarnPage() {
       window.removeEventListener("focus", onFocus);
       if (retryTimer.current) clearInterval(retryTimer.current);
     };
-  }, [userId]);
+  }, [userId, tryFlushQueue]); // ✅ tryFlushQueue 의존성 추가
 
   // 즉시 스캔 호출
   useEffect(() => {
@@ -131,18 +134,17 @@ export default function EarnPage() {
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, user_id: userId, client_event_id }),
+          body: JSON.stringify({ code, client_event_id }),
         });
         const json = await res.json();
 
         if (json?.ok) {
           setStatus("success");
           setMessage("활동이 기록되었습니다. /me 페이지에서 확인하세요.");
-          // 성공했으니 끝
           return;
         }
 
-        // 서버 응답은 왔지만 실패 → 큐 적재
+        // 서버 응답 실패 → 큐 적재
         const q = loadQueue();
         q.push({ code, ts: Date.now(), client_event_id });
         saveQueue(q);
@@ -150,7 +152,7 @@ export default function EarnPage() {
         setMessage(
           `오프라인(또는 서버 오류)으로 큐에 저장했어요. 네트워크가 연결되면 자동 재전송됩니다. (큐: ${q.length})`
         );
-      } catch (err) {
+      } catch {
         // 네트워크 에러 → 큐 적재
         const q = loadQueue();
         q.push({ code, ts: Date.now(), client_event_id });
@@ -169,7 +171,7 @@ export default function EarnPage() {
     <div className="max-w-lg mx-auto p-6 space-y-4">
       <h1 className="text-2xl font-bold">QR 스캔</h1>
       <p className="text-sm text-gray-500">
-        이 페이지는 QR 링크로 접근됩니다. 예: <code>/earn?b=부스코드</code>
+        이 페이지는 QR 링크로 접근됩니다. 예: <code>/earn?c=부스코드</code> 또는 <code>/earn?b=부스코드</code>
       </p>
 
       <div className="rounded-2xl border p-4">
