@@ -1,27 +1,34 @@
 // src/app/login/page.js
 "use client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";   // ✅ next 파라미터 사용
 
 export default function Login() {
+  const sp = useSearchParams();
+  const next = sp.get("next") || "/me";              // ✅ next 우선
+
   const [phone, setPhone] = useState("");
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
   const [cooldown, setCooldown] = useState(0);
 
-  // ✅ 이미 로그인된 상태면 /me로 보내기
+  // ✅ 이미 로그인된 상태면 프로필 상태에 따라 분기
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.user) location.href = "/me";
-      })
-      .catch(() => {});
-  }, []);
+    (async () => {
+      try {
+        const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
+        if (me?.user) {
+          const pc = await fetch("/api/profile-check").then(r => r.json());
+          location.href = pc.redirectTo === "/register" ? "/register" : next;
+        }
+      } catch {}
+    })();
+  }, [next]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const t = setInterval(() => setCooldown((c) => (c <= 1 ? 0 : c - 1)), 1000);
+    const t = setInterval(() => setCooldown(c => (c <= 1 ? 0 : c - 1)), 1000);
     return () => clearInterval(t);
   }, [cooldown]);
 
@@ -35,7 +42,7 @@ export default function Login() {
     const j = await r.json();
     if (j.ok) {
       setSent(true);
-      setCooldown(60); // 필요 시 15로 줄이기 가능
+      setCooldown(60);
       setMsg("문자를 보냈습니다.");
     } else {
       setMsg(j.error || "요청 실패");
@@ -50,11 +57,22 @@ export default function Login() {
       body: JSON.stringify({ phone, code }),
     });
     const j = await r.json();
-    if (j.ok) {
-      setMsg("로그인 성공!");
-      location.href = "/me";     // ✅ 성공 시 /me로 이동
-    } else {
+
+    if (!j.ok) {
       setMsg(j.error || "인증 실패");
+      return;
+    }
+
+    // ✅ 인증 성공 → 프로필 상태 확인 후 분기
+    try {
+      const pc = await fetch("/api/profile-check").then(r => r.json());
+      if (pc.redirectTo === "/register") {
+        location.href = "/register";
+      } else {
+        location.href = next; // next가 있으면 그쪽, 없으면 /me
+      }
+    } catch {
+      location.href = "/me";
     }
   };
 

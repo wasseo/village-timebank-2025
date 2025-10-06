@@ -1,81 +1,51 @@
+// src/app/register/page.js
 "use client";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-
-const to3 = (v) => String(v || "").replace(/\D/g, "").slice(0,3).padStart(3,"0");
-
-async function ensureSession() {
-  let { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    const { error } = await supabase.auth.signInAnonymously();
-    if (error) throw error;
-    ({ data: { session } } = await supabase.auth.getSession());
-  }
-  return session; // session.user.id 사용
-}
+import { useState } from "react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [num, setNum] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState("");
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [org, setOrg] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const session = await ensureSession();
-        const uid = session.user.id;
-
-        const { data } = await supabase
-          .from("profiles").select("participant_number").eq("id", uid).maybeSingle();
-        if (data?.participant_number) setNum(data.participant_number);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const save = async (e) => {
+  async function onSubmit(e) {
     e.preventDefault();
-    setMsg("");
-    try {
-      const session = await ensureSession();
-      const uid = session.user.id;
-
-      const clean = to3(num);
-      if (!clean || clean === "000") { setMsg("001~999 숫자만"); return; }
-
-      const { data: exists } = await supabase
-        .from("profiles").select("id").eq("participant_number", clean).maybeSingle();
-      if (exists && exists.id !== uid) { setMsg("이미 사용 중인 번호"); return; }
-
-      const { error } = await supabase
-        .from("profiles").upsert({ id: uid, participant_number: clean });
-      if (error) throw error;
-
-      setMsg("저장 완료!"); router.replace("/me");
-    } catch (err) {
-      setMsg("저장 실패: " + (err?.message || "unknown"));
+    if (!name.trim() || !address.trim()) {
+      alert("이름과 주소는 필수입니다.");
+      return;
     }
-  };
+    const r = await fetch("/api/profile", {
+      method: "PUT", // 이미 있는 profile API 재사용(없으면 POST로 동일 처리)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, address, organization: org }),
+    }).then(r => r.json());
 
-  if (loading) return <main style={{padding:24}}>불러오는 중...</main>;
+    if (!r.ok) {
+      alert(r.error || "저장 실패");
+      return;
+    }
+    router.replace("/me");
+  }
 
   return (
-    <main style={{maxWidth:420, margin:"60px auto", padding:24}}>
-      <h1 style={{fontSize:24, marginBottom:12}}>참가 번호 등록</h1>
-      <form onSubmit={save}>
-        <input
-          value={num}
-          onChange={(e)=>setNum(to3(e.target.value))}
-          placeholder="예: 001"
-          inputMode="numeric"
-          style={{width:"100%", padding:12, fontSize:18, textAlign:"center", letterSpacing:2}}
-        />
-        <button type="submit" style={{marginTop:12, width:"100%", padding:12}}>저장</button>
+    <div className="max-w-md mx-auto p-6">
+      <h1 className="text-xl font-bold mb-4">회원 정보 입력</h1>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="block mb-1">이름 *</label>
+          <input className="w-full input" value={name} onChange={e=>setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="block mb-1">주소 *</label>
+          <input className="w-full input" value={address} onChange={e=>setAddress(e.target.value)} />
+        </div>
+        <div>
+          <label className="block mb-1">소속 (선택)</label>
+          <input className="w-full input" value={org} onChange={e=>setOrg(e.target.value)} />
+        </div>
+        <button type="submit" className="btn-primary w-full mt-2">저장하고 시작하기</button>
       </form>
-      <p style={{marginTop:8, color:"#475569"}}>{msg}</p>
-    </main>
+    </div>
   );
 }

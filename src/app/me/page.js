@@ -1,6 +1,8 @@
+// src/app/me/page.js
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   RadarChart,
@@ -15,6 +17,7 @@ import {
 const DOMAINS = ["environment", "social", "economic", "mental"];
 
 export default function MePage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
   const [activities, setActivities] = useState([]);
@@ -22,7 +25,7 @@ export default function MePage() {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
 
-  // ✅ 합계(표시는 summary 기반; summary 없을 때만 로컬 산출)
+  // 합계(표시는 summary 기반; summary 없을 때만 로컬 산출)
   const localTotals = useMemo(() => {
     const earn = activities
       .filter((a) => a.kind === "earn")
@@ -30,19 +33,19 @@ export default function MePage() {
     const redeem = activities
       .filter((a) => a.kind === "redeem")
       .reduce((sum, a) => sum + Number(a.amount || 0), 0);
-    const total = earn + redeem;
+    const total = earn + redeem; // 교환도 양수 누적
     return { total, earn, redeem };
   }, [activities]);
 
   const totals = summary
     ? {
-        total: summary.total_points ?? 0,
-        earn: summary.earn_points ?? 0,
-        redeem: summary.redeem_points ?? 0,
+        total: Number(summary.total_points ?? summary.total ?? 0),
+        earn: Number(summary.earn_points ?? summary.earn ?? 0),
+        redeem: Number(summary.redeem_points ?? summary.redeem ?? 0),
       }
     : localTotals;
 
-  // ✅ 레이더 데이터: summary 값 사용 (정확/간단)
+  // 레이더 데이터: summary 값 사용(정확/간단)
   const radar = useMemo(() => {
     if (summary) {
       return DOMAINS.map((d) => ({
@@ -50,14 +53,13 @@ export default function MePage() {
         value: Number(summary[d] ?? 0),
       }));
     }
-    // (백업) summary가 오기 전, 활동×타겟으로 임시 계산
+    // (백업) summary가 오기 전 임시 계산
     const byDomain = Object.fromEntries(DOMAINS.map((d) => [d, 0]));
     if (!activities.length || !targets.length) {
       return DOMAINS.map((d) => ({ domain: d, value: 0 }));
     }
     const map = targets.reduce((acc, t) => {
       if (!acc[t.booth_id]) acc[t.booth_id] = [];
-      // factor 우선, 없으면 weight, 둘 다 없으면 1
       const weight = Number(t.factor ?? t.weight ?? 1);
       acc[t.booth_id].push({ domain_code: t.domain_code, weight });
       return acc;
@@ -67,12 +69,14 @@ export default function MePage() {
       const amt = Number(a.amount || 0);
       for (const t of tlist) {
         if (!t?.domain_code) continue;
-        byDomain[t.domain_code] = (byDomain[t.domain_code] || 0) + amt * (isNaN(t.weight) ? 0 : t.weight);
+        byDomain[t.domain_code] =
+          (byDomain[t.domain_code] || 0) + amt * (isNaN(t.weight) ? 0 : t.weight);
       }
     }
     return DOMAINS.map((d) => ({ domain: d, value: byDomain[d] || 0 }));
   }, [summary, activities, targets]);
 
+  // 데이터 로딩
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -80,16 +84,19 @@ export default function MePage() {
         setLoading(true);
         setError(null);
 
-        // 1) iron-session 사용자 확인
+        // 1) iron-session 사용자 확인 (없으면 로그인으로)
         const me = await fetch("/api/me").then((r) => r.json()).catch(() => null);
         const uid = me?.user?.id;
-        if (!uid) throw new Error("로그인이 필요합니다.");
+        if (!uid) {
+          router.replace("/login?next=/me");
+          return;
+        }
         if (!mounted) return;
         setUserId(uid);
 
-        // 2) 요약(서버 뷰) 먼저 가져오기 → 합계/레이더는 이걸 기준으로
-        const sres = await fetch("/api/me/summary").then((r) => r.json());
-        if (sres?.ok) setSummary(sres.summary);
+        // 2) 요약(서버 뷰) 먼저
+        const sres = await fetch("/api/me/summary").then((r) => r.json()).catch(() => null);
+        if (sres?.ok && mounted) setSummary(sres.summary);
 
         // 3) 활동 목록 (리스트 표시용)
         const { data: acts, error: aErr } = await supabase
@@ -101,7 +108,7 @@ export default function MePage() {
         if (!mounted) return;
         setActivities(acts || []);
 
-        // 4) 부스 타겟 (summary가 있으면 없어도 되지만, 레이더 대체 계산/디버그용)
+        // 4) 부스 타겟 (레이더 대체 계산/디버그용)
         const boothIds = Array.from(new Set((acts || []).map((a) => a.booth_id))).filter(Boolean);
         if (boothIds.length) {
           const { data: tgs, error: tErr } = await supabase
@@ -124,16 +131,35 @@ export default function MePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [router]);
+
+  // 액션들
+  async function onLogout() {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch {}
+    router.replace("/"); // 홈으로
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">내 활동</h1>
-        <p className="text-sm text-gray-500">
-          교환(redeem)도 “양수”로 누적해요. UI에서만 교환/적립으로 구분합니다.
-        </p>
-      </header>
+      {/* 상단 액션 */}
+      <div className="flex items-center justify-between">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-bold">내 활동</h1>
+          <p className="text-sm text-gray-500">
+            교환(redeem)도 양수로 누적해 합계를 계산합니다.
+          </p>
+        </header>
+        <div className="flex gap-2">
+          <button className="rounded-xl border px-3 py-2" onClick={() => router.push("/scan")}>
+            QR 스캔
+          </button>
+          <button className="rounded-xl border px-3 py-2" onClick={onLogout}>
+            로그아웃
+          </button>
+        </div>
+      </div>
 
       {/* 합계 카드 */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">

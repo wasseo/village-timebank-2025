@@ -41,8 +41,11 @@ export function middleware(req) {
   }
 
   // 보호하고 싶은 경로 정의
-  const needsAuth = pathname.startsWith("/me") || pathname.startsWith("/earn");
-
+  const needsAuth = 
+        pathname.startsWith("/me") || 
+        pathname.startsWith("/earn") ||
+        pathname.startsWith("/register") ;
+     
   // 인증 불필요한 경로면 통과
   if (!needsAuth) return NextResponse.next();
 
