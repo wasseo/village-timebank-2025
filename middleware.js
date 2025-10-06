@@ -18,10 +18,18 @@ function isAsset(pathname) {
   );
 }
 
-/** Supabase 세션 쿠키 존재여부 (auth-helpers 기본 쿠키명) */
-function hasSupabaseSession(req) {
+/** 세션 쿠키 확인: iron-session + (옵션) Supabase */
+const IRON_COOKIE = process.env.IRON_SESSION_COOKIE_NAME || "tb_session";
+function hasAnySession(req) {
   const c = req.cookies;
-  return c.has("sb-access-token") && c.has("sb-refresh-token");
+
+  // iron-session (로그인 성공 시 생성되는 쿠키)
+  if (c.has(IRON_COOKIE)) return true;
+
+  // Supabase(병행 사용 시)
+  if (c.has("sb-access-token") && c.has("sb-refresh-token")) return true;
+
+  return false;
 }
 
 export function middleware(req) {
@@ -39,7 +47,7 @@ export function middleware(req) {
   if (!needsAuth) return NextResponse.next();
 
   // 세션 있으면 통과
-  if (hasSupabaseSession(req)) return NextResponse.next();
+  if (hasAnySession(req)) return NextResponse.next();
 
   // 세션 없으면 로그인 페이지로 리다이렉트 (+ next 파라미터 전달)
   const url = req.nextUrl.clone();
@@ -53,3 +61,4 @@ export function middleware(req) {
 export const config = {
   matcher: ["/:path*"],
 };
+

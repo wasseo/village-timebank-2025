@@ -5,6 +5,7 @@ import { sessionOptions } from "@/lib/session";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic"; // 캐시 방지(개발 편의)
+export const runtime = "nodejs";  // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,

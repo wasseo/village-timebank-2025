@@ -4,6 +4,8 @@ import { getIronSession } from "iron-session";
 import { sessionOptions } from "@/lib/session";               // 세션 설정 (이미 만들어둔 파일)
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";  // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+
 // 서버 전용 Supabase 클라이언트 (service role key 사용)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,6 +41,8 @@ export async function PUT(req) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
+
+  
   const body = await req.json();
   const name  = String(body?.name ?? "").trim();
   const org   = String(body?.org  ?? "").trim();

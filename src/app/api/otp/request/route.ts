@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { genCode, hashCode } from "@/lib/crypto";
 import { sendSmsViaSolapi } from "@/lib/solapi";
 
+export const runtime = "nodejs" ; // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+
 // 숫자만 8~20 자리로 제한
 const schema = z.object({
   phone: z.string().regex(/^\d{8,20}$/, "전화번호 형식이 올바르지 않습니다."),

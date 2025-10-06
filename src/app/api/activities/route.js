@@ -3,6 +3,8 @@ import { getIronSession } from "iron-session";
 import { sessionOptions } from "@/lib/session";
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs" ;  // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export async function GET(req) {
