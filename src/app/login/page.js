@@ -1,11 +1,22 @@
 // src/app/login/page.js
 "use client";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";   // ✅ next 파라미터 사용
 
-export default function Login() {
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
+export const dynamic = "force-dynamic"; // 프리렌더/CSR bail-out 관련 빌드 오류 방지
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">로딩 중…</div>}>
+      <LoginBody />
+    </Suspense>
+  );
+}
+
+function LoginBody() {
   const sp = useSearchParams();
-  const next = sp.get("next") || "/me";              // ✅ next 우선
+  const next = sp.get("next") || "/me";
 
   const [phone, setPhone] = useState("");
   const [sent, setSent] = useState(false);
@@ -13,13 +24,13 @@ export default function Login() {
   const [msg, setMsg] = useState("");
   const [cooldown, setCooldown] = useState(0);
 
-  // ✅ 이미 로그인된 상태면 프로필 상태에 따라 분기
+  // 이미 로그인된 상태면 프로필 상태에 따라 분기
   useEffect(() => {
     (async () => {
       try {
-        const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
+        const me = await fetch("/api/me").then((r) => r.json()).catch(() => null);
         if (me?.user) {
-          const pc = await fetch("/api/profile-check").then(r => r.json());
+          const pc = await fetch("/api/profile-check").then((r) => r.json());
           location.href = pc.redirectTo === "/register" ? "/register" : next;
         }
       } catch {}
@@ -28,7 +39,7 @@ export default function Login() {
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const t = setInterval(() => setCooldown(c => (c <= 1 ? 0 : c - 1)), 1000);
+    const t = setInterval(() => setCooldown((c) => (c <= 1 ? 0 : c - 1)), 1000);
     return () => clearInterval(t);
   }, [cooldown]);
 
@@ -63,9 +74,8 @@ export default function Login() {
       return;
     }
 
-    // ✅ 인증 성공 → 프로필 상태 확인 후 분기
     try {
-      const pc = await fetch("/api/profile-check").then(r => r.json());
+      const pc = await fetch("/api/profile-check").then((r) => r.json());
       if (pc.redirectTo === "/register") {
         location.href = "/register";
       } else {
