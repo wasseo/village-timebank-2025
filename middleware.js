@@ -44,7 +44,7 @@ export function middleware(req) {
   const needsAuth = 
         pathname.startsWith("/me") || 
         pathname.startsWith("/earn") ||
-        pathname.startsWith("/register") ;
+        pathname.startsWith("/register") ;  
      
   // 인증 불필요한 경로면 통과
   if (!needsAuth) return NextResponse.next();
