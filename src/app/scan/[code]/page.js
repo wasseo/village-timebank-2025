@@ -67,7 +67,7 @@ export default function ScanByPathPage({ params }) {
           user_id: userId,
           booth_id: booth.id,
           category: t.domain_code,                 // social | environment | economic | mental
-          points: base * Number(t.factor || 1),    // 항상 양수
+          amount: Math.trunc(base * Number(t.factor || 1)),    // <DB컬럼에 맞춤 (int)
           kind: booth.kind || "earn",              // earn | redeem
         }));
 
@@ -80,7 +80,7 @@ export default function ScanByPathPage({ params }) {
         }
 
         // 7) 완료 메시지
-        const summary = rows.map(r => `${r.category}+${r.points}`).join(", ");
+        const summary = rows.map(r => `${r.category}+${r.amount}`).join(", ");
         setMsg(`처리 완료! ${booth.name} · ${summary}`);
         // 필요하면 자동 이동:
         // setTimeout(() => (location.href = "/me"), 1200);
