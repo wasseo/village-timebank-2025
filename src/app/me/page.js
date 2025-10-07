@@ -1,7 +1,7 @@
 // src/app/me/page.js
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer
@@ -68,12 +68,12 @@ export default function MyPage() {
     economic: "경제",
     mental: "정신",
   };
-  const radarData = useMemo(() => ([
+  const radarData = [
     { domain: "environment", total: summary.byCategory?.environment || 0 },
     { domain: "social",      total: summary.byCategory?.social      || 0 },
     { domain: "mental",      total: summary.byCategory?.mental      || 0 },
     { domain: "economic",    total: summary.byCategory?.economic    || 0 },
-  ]), [summary]);
+  ] ;
 
   const fmt = (n) => `+${Number(n || 0)}`;
 
