@@ -301,8 +301,19 @@ export default function ScanPage() {
     }
   }
 
-  // 스캔 처리
-  async function handleScanResult(text) {
+  // 스캔 처리 (수정)
+ async function handleScanResult(text) {
+  const raw = String(text || "").trim();
+  if (!raw) { setMsg("QR 형식이 올바르지 않습니다."); return; }
+
+  // ✨ http/https 링크면 그냥 이동 (네이버 단축링크 포함)
+  if (/^https?:\/\//i.test(raw)) {
+    setMsg("링크로 이동 중…");
+    location.href = raw;   // 리다이렉트는 브라우저가 따라가고,
+    return;                // /scan/<slug>로 도착하면 [slug] 페이지가 code로 변환합니다.
+  }
+
+    //이하 기존 처리
     const payload = parseAnyText(text);
     if (!payload) {
       setMsg("QR 형식이 올바르지 않습니다.");

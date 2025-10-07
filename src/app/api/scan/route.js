@@ -4,7 +4,7 @@ import { getIronSession } from "iron-session";
 import { sessionOptions } from "@/lib/session";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";  // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+export const runtime = "nodejs"; // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -26,9 +26,20 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
 
     // b(booth_id) 또는 code 모두 허용
-    const booth_id_param  = (body?.b || body?.booth_id || "").trim();
-    const code_param      = (body?.code || body?.c || "").trim();
+    let booth_id_param = (body?.b || body?.booth_id || "").trim();
+    let code_param     = (body?.code || body?.c || "").trim();
     const client_event_id = body?.client_event_id ?? body?.e ?? null;
+
+    /* ✅ [추가] code가 URL인 경우 /scan/<slug> 추출 */
+    if (code_param && /^https?:\/\//i.test(code_param)) {
+      try {
+        const u = new URL(code_param);
+        const m = u.pathname.match(/\/scan\/([A-Za-z0-9\-_.~]+)/);
+        if (m?.[1]) code_param = m[1];
+      } catch {
+        // URL 파싱 실패시 무시
+      }
+    }
 
     if (!booth_id_param && !code_param) {
       return NextResponse.json(
