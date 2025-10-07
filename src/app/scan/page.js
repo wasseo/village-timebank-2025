@@ -4,6 +4,21 @@
 import { useEffect, useRef, useState } from "react";
 import QrScanner from "qr-scanner";
 
+/* --------- QrScanner Worker 설정 (Next/Webpack 호환 + 폴백) --------- */
+try {
+  // 방식 A: 번들러가 ?worker&url을 지원하면 이게 제일 편함
+  // eslint-disable-next-line import/no-webpack-loader-syntax
+  // @ts-ignore
+  import("qr-scanner/qr-scanner-worker.min.js?worker&url").then((m) => {
+    if (m?.default) QrScanner.WORKER_PATH = m.default;
+  }).catch(() => {
+    // 방식 B: public 폴백 (public/qr-scanner-worker.min.js에 파일을 두세요)
+    QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js";
+  });
+} catch {
+  QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js";
+}
+
 /* ---------- 로컬 스토리지 헬퍼 ---------- */
 const PENDING_KEY = "pendingScan";
 const savePending = (p) => { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch {} };
@@ -49,9 +64,7 @@ function getIOSContext() {
   if (typeof window === "undefined") return { isIOS: false, isStandalone: false, isSafari: false };
   const ua = navigator.userAgent || "";
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
-  // PWA/홈화면 모드 감지
   const isStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
-  // 사파리 감지: 크롬/앱웹뷰를 제외
   const isSafari = isIOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|GSA|OPiOS/i.test(ua);
   return { isIOS, isStandalone, isSafari };
 }
@@ -70,7 +83,7 @@ export default function ScanPage() {
   const [deviceId, setDeviceId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // iOS UX 안내 플래그
+  // iOS UX 안내
   const [{ isIOS, isStandalone, isSafari }, setIOSCtx] = useState({ isIOS: false, isStandalone: false, isSafari: true });
 
   // 전송 가드: 짧은 쿨타임 & 중복 전송 방지
@@ -81,6 +94,10 @@ export default function ScanPage() {
     const t = setTimeout(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
+
+  // 디버그(스캔 에러 표시용)
+  const [debug, setDebug] = useState("");
+  const [showDebug, setShowDebug] = useState(false);
 
   // 로그인 후 자동복귀 처리
   useEffect(() => {
@@ -139,11 +156,10 @@ export default function ScanPage() {
 
         const scanner = new QrScanner(
           videoRef.current,
-          result => {
+          (result) => {
             if (!active) return;
             const text = result?.data || result;
-            // 쿨다운/전송 중이면 무시 (중복 방지)
-            if (sendingRef.current || cooldown > 0) return;
+            if (sendingRef.current || cooldown > 0) return; // 중복 방지
             handleScanResult(text);
           },
           {
@@ -151,6 +167,18 @@ export default function ScanPage() {
             returnDetailedScanResult: true,
             highlightScanRegion: true,
             highlightCodeOutline: true,
+
+            // ▼ 디코딩 튜닝
+            maxScansPerSecond: 8,                 // CPU 부하 대비 안정 속도
+            preferredResolution: 1280,            // 낮으면 인식이 어려움 → 720~1280 권장
+            // 반전된 코드(흰 바탕/검정 바코드가 아닌 경우)도 시도
+            // @ts-ignore (옵션은 라이브러리 버전에 따라 다름)
+            tryInverted: true,
+
+            // 디버그: 실패 메시지 확인 (옵션 지원 버전)
+            onDecodeError: (e) => {
+              if (showDebug) setDebug(String(e?.message || e || ""));
+            },
           }
         );
         scannerRef.current = scanner;
@@ -186,7 +214,7 @@ export default function ScanPage() {
       scannerRef.current?.destroy();
       navigator.mediaDevices?.removeEventListener?.("devicechange", onDeviceChange);
     };
-  }, [cooldown]);
+  }, [cooldown, showDebug]);
 
   // 카메라 전환
   const handleChangeDevice = async (id) => {
@@ -303,7 +331,7 @@ export default function ScanPage() {
     <div className="p-4 space-y-4 max-w-md mx-auto">
       <h1 className="text-xl font-bold">QR 스캔</h1>
 
-      {/* iPhone 최적화 안내 (Safari 권장 + PWA 경고) */}
+      {/* iPhone 최적화 안내 */}
       {isIOS && (
         <div className="text-xs rounded-lg border p-3 bg-amber-50 border-amber-200 text-amber-900">
           {!isSafari && (
@@ -315,7 +343,7 @@ export default function ScanPage() {
         </div>
       )}
 
-      {/* 카메라 선택/제어 */}
+      {/* 카메라 선택/제어 + 디버그 토글 */}
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm text-gray-600">카메라</label>
         <select
@@ -341,8 +369,11 @@ export default function ScanPage() {
         <button className="border rounded px-3 py-2" onClick={toggleTorch}>
           {torch ? "플래시 끄기" : "플래시 켜기"}
         </button>
+        <label className="text-xs flex items-center gap-1 ml-auto cursor-pointer select-none">
+          <input type="checkbox" checked={showDebug} onChange={(e)=>setShowDebug(e.target.checked)} />
+          디코딩 디버그
+        </label>
 
-        {/* 쿨다운 표시 */}
         {cooldown > 0 && (
           <span className="text-xs px-2 py-1 rounded border bg-gray-50 text-gray-700">
             {cooldown}s 대기 중…
@@ -357,6 +388,7 @@ export default function ScanPage() {
           className="w-full aspect-[3/4] object-cover bg-black"
           muted
           playsInline
+          autoPlay
         />
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center text-white bg-black/30">
@@ -391,13 +423,18 @@ export default function ScanPage() {
         </button>
       </div>
 
-      {/* 상태/마지막 처리 */}
+      {/* 상태/마지막 처리 + 디버그 */}
       <div className="space-y-1">
         <div className="text-sm text-gray-600">{msg}</div>
         {last && (
           <div className="text-xs text-gray-500 break-all">
             마지막 처리: {JSON.stringify(last)}
           </div>
+        )}
+        {showDebug && debug && (
+          <pre className="text-xs text-gray-500 whitespace-pre-wrap break-all border rounded p-2 bg-gray-50">
+            {debug}
+          </pre>
         )}
       </div>
     </div>
