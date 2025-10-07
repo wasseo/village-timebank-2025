@@ -6,13 +6,11 @@ import QrScanner from "qr-scanner";
 
 /* --------- QrScanner Worker 설정 (Next/Webpack 호환 + 폴백) --------- */
 try {
-  // 방식 A: 번들러가 ?worker&url을 지원하면 이게 제일 편함
   // eslint-disable-next-line import/no-webpack-loader-syntax
   // @ts-ignore
   import("qr-scanner/qr-scanner-worker.min.js?worker&url").then((m) => {
     if (m?.default) QrScanner.WORKER_PATH = m.default;
   }).catch(() => {
-    // 방식 B: public 폴백 (public/qr-scanner-worker.min.js에 파일을 두세요)
     QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js";
   });
 } catch {
@@ -25,9 +23,15 @@ const savePending = (p) => { try { localStorage.setItem(PENDING_KEY, JSON.string
 const readPending  = () => { try { const v = localStorage.getItem(PENDING_KEY); return v ? JSON.parse(v) : null; } catch { return null } };
 const clearPending = () => { try { localStorage.removeItem(PENDING_KEY); } catch {} };
 
-/* ---------- URL 파라미터 → payload 매핑 ---------- */
+/* ---------- URL 파라미터/경로 → payload 매핑 ---------- */
 function pickPayloadFromLocation() {
   if (typeof window === "undefined") return null;
+
+  // /scan/<slug> 또는 /s/<slug> 경로 지원
+  const path = window.location.pathname.replace(/^\/+/, "");
+  const m = path.match(/^(scan|s)\/([A-Za-z0-9\-_.~]+)/);
+  if (m?.[2]) return { code: m[2] };
+
   const sp = new URLSearchParams(window.location.search);
   const code = (sp.get("code") || sp.get("c") || "").trim();
   const b    = (sp.get("b") || sp.get("booth_id") || "").trim();
@@ -79,18 +83,14 @@ function parseAnyText(text) {
       }
 
       // (b) /scan/<slug> 또는 /s/<slug> 형태에서 slug 추출
-      const path = u.pathname.replace(/^\/+/, ""); // e.g. "scan/gmw-05638d0e"
-      const segs = path.split("/");
-      if ((segs[0] === "scan" || segs[0] === "s") && segs[1]) {
-        return { code: segs[1] };
-      }
+      const m2 = u.pathname.match(/\/(scan|s)\/([A-Za-z0-9\-_.~]+)/);
+      if (m2?.[2]) return { code: m2[2] };
 
       // (c) /booth/<id> 형태 지원
-      if (segs[0] === "booth" && segs[1]) {
-        return { b: segs[1] };
-      }
+      const m3 = u.pathname.match(/\/booth\/([A-Za-z0-9\-_.~]+)/);
+      if (m3?.[1]) return { b: m3[1] };
 
-      // (d) 그 외 URL은 최후 수단: 전체를 code로 넘김 (서버에서 후처리할 수 있게)
+      // (d) 그 외 URL은 서버에서 후처리할 수 있게 전체를 code로
       return { code: t };
     } catch {
       // URL 파싱 실패 시 아래 일반 폴백으로
@@ -211,13 +211,11 @@ export default function ScanPage() {
             highlightCodeOutline: true,
 
             // ▼ 디코딩 튜닝
-            maxScansPerSecond: 8,                 // CPU 부하 대비 안정 속도
-            preferredResolution: 1280,            // 낮으면 인식이 어려움 → 720~1280 권장
-            // 반전된 코드(흰 바탕/검정 바코드가 아닌 경우)도 시도
-            // @ts-ignore (옵션은 라이브러리 버전에 따라 다름)
+            maxScansPerSecond: 8,
+            preferredResolution: 1280,
+            // @ts-ignore
             tryInverted: true,
 
-            // 디버그: 실패 메시지 확인 (옵션 지원 버전)
             onDecodeError: (e) => {
               if (showDebug) setDebug(String(e?.message || e || ""));
             },
@@ -301,30 +299,64 @@ export default function ScanPage() {
     }
   }
 
-  // 스캔 처리 (수정)
- async function handleScanResult(text) {
-  const raw = String(text || "").trim();
-  if (!raw) { setMsg("QR 형식이 올바르지 않습니다."); return; }
-
-  // ✨ http/https 링크면 그냥 이동 (네이버 단축링크 포함)
-  if (/^https?:\/\//i.test(raw)) {
+  // --- 추가: 카메라/스캐너 정리 후 외부 이동 ---
+  async function navigateExternal(url) {
     setMsg("링크로 이동 중…");
-    location.href = raw;   // 리다이렉트는 브라우저가 따라가고,
-    return;                // /scan/<slug>로 도착하면 [slug] 페이지가 code로 변환합니다.
+    sendingRef.current = true;
+    setCooldown(2);
+
+    try { await scannerRef.current?.turnFlashOff?.(); } catch {}
+    try { await scannerRef.current?.stop?.(); } catch {}
+    try { scannerRef.current?.destroy?.(); } catch {}
+    try {
+      const stream = videoRef.current?.srcObject;
+      stream?.getTracks?.().forEach(t => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    } catch {}
+
+    const target = String(url);
+    setTimeout(() => { window.location.replace(target); }, 50);
+    setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        const a = document.createElement("a");
+        a.href = target;
+        a.target = "_self";
+        a.rel = "noreferrer";
+        document.body.appendChild(a);
+        a.click();
+      }
+    }, 1000);
   }
 
-    //이하 기존 처리
-    const payload = parseAnyText(text);
+  // --- 스캔 처리: 외부 링크면 정리 후 이동, 아니면 서버 전송 ---
+  async function handleScanResult(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      setMsg("QR 형식이 올바르지 않습니다.");
+      return;
+    }
+
+    // http/https 링크면 스캐너 정리 후 이동 (네이버 단축링크 포함)
+    if (/^https?:\/\//i.test(raw)) {
+      await navigateExternal(raw);
+      return;
+    }
+
+    // 그 외: 우리 규격 파싱(tb://, booth-xxx, 일반 code 문자열)
+    const payload = parseAnyText(raw);
     if (!payload) {
       setMsg("QR 형식이 올바르지 않습니다.");
       return;
     }
+
+    // 로그인 확인
     const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
     if (!me?.user?.id) {
       savePending(payload);
       location.href = `/login?next=${encodeURIComponent("/scan?auto=1")}`;
       return;
     }
+
     setMsg("전송 중…");
     await sendToServer(payload);
   }
