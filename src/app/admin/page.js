@@ -16,14 +16,12 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        // 로그인 확인
         const meRes = await fetch("/api/me").then(r => r.json()).catch(() => null);
         if (!meRes?.user?.id) {
           const next = encodeURIComponent("/admin");
           location.href = `/login?next=${next}`;
           return;
         }
-        // (선택) 간단한 접근 제한
         const adminCsv = (process.env.NEXT_PUBLIC_ADMIN_UIDS || "")
           .split(",").map(s => s.trim()).filter(Boolean);
         if (adminCsv.length && !adminCsv.includes(meRes.user.id)) {
@@ -32,7 +30,6 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        // 메트릭 로드 (range 적용)
         const j = await fetch(`/api/admin/metrics?range=${range}`).then(r => r.json());
         if (!j.ok) throw new Error(j.error || "metrics failed");
         setData(j);
@@ -59,11 +56,11 @@ export default function AdminDashboardPage() {
     domainTotals = [],
   } = data || {};
 
-  // 라벨/마스킹 유틸
   const KR = { environment: "환경", social: "사회", economic: "경제", mental: "정신" };
+
   const maskName = (raw) => {
     if (!raw) return "익명";
-    if (/^[0-9a-f-]{20,}$/i.test(raw)) return `사용자(${raw.slice(0,8)})`; // UUID
+    if (/^[0-9a-f-]{20,}$/i.test(raw)) return `사용자(${raw.slice(0,8)})`;
     const s = String(raw);
     if (s.length <= 1) return s;
     if (s.length === 2) return s[0] + "*";
@@ -77,7 +74,7 @@ export default function AdminDashboardPage() {
   const rankLabel = (x) => `${maskName(x.name)} / ${last4(x.phone)}`;
 
   const Card = ({ title, children }) => (
-    <div className="rounded-2xl border p-4">
+    <div className="rounded-2xl border p-5">
       <div className="font-semibold mb-2">{title}</div>
       {children}
     </div>
@@ -88,6 +85,19 @@ export default function AdminDashboardPage() {
       {items.map((x, i) => (
         <li key={i} className="flex justify-between">
           <span>{i + 1}. {rankLabel(x)}</span>
+          <span className="font-mono">+{x.total}</span>
+        </li>
+      ))}
+      {items.length === 0 && <li className="text-gray-500">데이터 없음</li>}
+    </ol>
+  );
+
+  // 부스 전용: 전체 이름 표시(마스킹/전화번호 표시 X)
+  const RankListBooth = ({ items }) => (
+    <ol className="space-y-1">
+      {items.map((x, i) => (
+        <li key={i} className="flex justify-between">
+          <span>{i + 1}. {x.name || x.id}</span>
           <span className="font-mono">+{x.total}</span>
         </li>
       ))}
@@ -165,22 +175,18 @@ export default function AdminDashboardPage() {
         <Card title={`교환(Redeem)이 많은 사람 Top3 · ${rangeLabel}`}>
           <RankList items={topUsersRedeem} />
         </Card>
-        <Card title={`적립이 많은 부스 Top3 / 교환이 많은 부스 Top3 · ${rangeLabel}`}>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm mb-1">적립 Top3</div>
-              <RankList items={topBoothsEarn} />
-            </div>
-            <div>
-              <div className="text-sm mb-1">교환 Top3</div>
-              <RankList items={topBoothsRedeem} />
-            </div>
-          </div>
+
+        {/* ✅ 부스 Top3를 각각 큰 카드로 분리 + 이름 전체 표시 */}
+        <Card title={`적립이 많은 부스 Top3 · ${rangeLabel}`}>
+          <RankListBooth items={topBoothsEarn} />
+        </Card>
+        <Card title={`교환이 많은 부스 Top3 · ${rangeLabel}`}>
+          <RankListBooth items={topBoothsRedeem} />
         </Card>
       </div>
 
       {/* 6. 분야 합계 – 방사형 차트 */}
-      <Card title={`환경·사회·경제·정신 합계 (레이더) · ${rangeLabel}`}>
+      <Card title={`2025경기마을공동체 활동자산 · ${rangeLabel}`}>
         <div style={{ width: "100%", height: 320 }}>
           <ResponsiveContainer>
             <RadarChart data={domainTotals}>
