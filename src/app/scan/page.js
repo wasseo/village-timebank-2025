@@ -44,6 +44,8 @@ function pickPayloadFromLocation() {
 function parseAnyText(text) {
   const t = String(text || "").trim();
   if (!t) return null;
+
+  // 1) 우리 규격 tb://booth/<id>?k=earn&amt=2
   if (t.startsWith("tb://")) {
     try {
       const u = new URL(t);
@@ -55,7 +57,47 @@ function parseAnyText(text) {
       return { b: boothId, kind: k === "redeem" ? "redeem" : "earn", amount: Math.max(1, amt) };
     } catch {}
   }
+
+  // 2) booth-xxx 직접 코드
   if (/^booth[-_]/i.test(t)) return { b: t };
+
+  // 3) http(s) URL일 때: /scan/<slug> 또는 ?code=… 추출
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t);
+
+      // (a) 쿼리파라미터 우선
+      const qpCode = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
+      const qpBooth = (u.searchParams.get("b") || u.searchParams.get("booth_id") || "").trim();
+      const qpE = (u.searchParams.get("e") || "").trim();
+      if (qpCode || qpBooth) {
+        const payload = {};
+        if (qpCode) payload.code = qpCode;
+        if (qpBooth) payload.b = qpBooth;
+        if (qpE) payload.client_event_id = qpE;
+        return payload;
+      }
+
+      // (b) /scan/<slug> 또는 /s/<slug> 형태에서 slug 추출
+      const path = u.pathname.replace(/^\/+/, ""); // e.g. "scan/gmw-05638d0e"
+      const segs = path.split("/");
+      if ((segs[0] === "scan" || segs[0] === "s") && segs[1]) {
+        return { code: segs[1] };
+      }
+
+      // (c) /booth/<id> 형태 지원
+      if (segs[0] === "booth" && segs[1]) {
+        return { b: segs[1] };
+      }
+
+      // (d) 그 외 URL은 최후 수단: 전체를 code로 넘김 (서버에서 후처리할 수 있게)
+      return { code: t };
+    } catch {
+      // URL 파싱 실패 시 아래 일반 폴백으로
+    }
+  }
+
+  // 4) 일반 문자열은 code로 처리
   return { code: t };
 }
 
