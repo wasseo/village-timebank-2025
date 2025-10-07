@@ -6,15 +6,19 @@ const url  = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key  = process.env.SUPABASE_SERVICE_ROLE_KEY; // 서버 전용 키
 if (!url || !key) console.warn("Admin metrics: missing Supabase URL or SERVICE ROLE KEY");
 
-export async function GET() {
+export async function GET(request) {
   try {
     const supabase = createClient(url, key);
 
     // 기간토글 : day1(테스트기간~10/18), day2(10/19~)
-    const EVENT_TZ = "+09:00"; // KST
-    const DAY1_END_KST = "2025-10-18T23:59:59.999" + EVENT_TZ;
-    const DAY2_START_KST = "2025-10-19T00:00:00.000" + EVENT_TZ;
-    const range = (new URLSearchParams(new URL(request.url).search).get("range") || "").toLowerCase();
+
+    const DAY1_END_KST   = "2025-10-18T23:59:59.999+09:00";
+    const DAY2_START_KST = "2025-10-19T00:00:00.000+09:00";
+    const { searchParams } = new URL(request.url);
+    const range = (searchParams.get("range") || "").toLowerCase();
+
+
+
     // 넉넉히 30일 범위 로드 후 메모리 필터 (간단/안전)
     const sinceISO = new Date("2025-10-01T00:00:00.000Z").toISOString();
 
