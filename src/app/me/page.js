@@ -1,4 +1,3 @@
-// src/app/me/page.js
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -28,35 +27,18 @@ export default function MyPage() {
           return;
         }
 
-        // 활동 요약/최근 2건
+        // 활동 요약 + 최근 활동(서버에서 부스명까지 조인됨)
         const acts = await fetch("/api/activities").then(r => r.json());
         if (!acts?.ok) throw new Error(acts?.error || "활동을 불러오지 못했습니다.");
 
-        setSummary(acts.summary || summary);
-
-        const recent2 = Array.isArray(acts.list) ? acts.list.slice(0, 2) : [];
-
-        // 부스명 주입 (필요한 것만, 소량 호출)
-        const withNames = await Promise.all(
-          recent2.map(async (a) => {
-            try {
-              const r = await fetch(`/api/booth-name?booth_id=${encodeURIComponent(a.booth_id)}`);
-              const j = await r.json();
-              return { ...a, booth_name: j?.name || a.booth_id };
-            } catch {
-              return { ...a, booth_name: a.booth_id };
-            }
-          })
-        );
-
-        setList(withNames);
+        setSummary(acts.summary || {});
+        setList(Array.isArray(acts.list) ? acts.list : []);
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
       } finally {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const KR = {
@@ -66,24 +48,24 @@ export default function MyPage() {
     mental: "정신",
   };
 
+  // ✅ 레이더 데이터 메모화
   const radarData = useMemo(
-  () => ([
-    { domain: "environment", total: summary.byCategory?.environment || 0 },
-    { domain: "social",      total: summary.byCategory?.social      || 0 },
-    { domain: "mental",      total: summary.byCategory?.mental      || 0 },
-    { domain: "economic",    total: summary.byCategory?.economic    || 0 },
-  ]),
-  [
-    summary.byCategory?.environment,
-    summary.byCategory?.social,
-    summary.byCategory?.mental,
-    summary.byCategory?.economic,
-  ]
-);
+    () => ([
+      { domain: "environment", total: summary.byCategory?.environment || 0 },
+      { domain: "social",      total: summary.byCategory?.social      || 0 },
+      { domain: "mental",      total: summary.byCategory?.mental      || 0 },
+      { domain: "economic",    total: summary.byCategory?.economic    || 0 },
+    ]),
+    [
+      summary.byCategory?.environment,
+      summary.byCategory?.social,
+      summary.byCategory?.mental,
+      summary.byCategory?.economic,
+    ]
+  );
 
-
-if (loading) return <main className="p-6">불러오는 중…</main>;
-if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
+  if (loading) return <main className="p-6">불러오는 중…</main>;
+  if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
 
   const fmt = (n) => `+${Number(n || 0)}`;
 
@@ -94,15 +76,21 @@ if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
     </div>
   );
 
+  // ✅ 부스명은 booths(name) 조인값 → booth_name(이전호환) → booth_id
   const ActivityItem = ({ a }) => {
+    const boothName = a?.booths?.name ?? a?.booth_name ?? a?.booth_id;
     const d = new Date(a.created_at);
-    const when = isNaN(+d) ? "" : d.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const when = isNaN(+d)
+      ? ""
+      : d.toLocaleString("ko-KR", {
+          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+        });
     const kindLabel = a.kind === "redeem" ? "교환" : "적립";
     return (
       <li className="flex items-center justify-between py-2">
         <div className="text-sm">
           <div className="font-medium">
-            {a.booth_name || a.booth_id} <span className="text-gray-500">· {kindLabel}</span>
+            {boothName} <span className="text-gray-500">· {kindLabel}</span>
           </div>
           <div className="text-gray-500">{when}</div>
         </div>
@@ -134,7 +122,7 @@ if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
         <StatCard title="교환(Redeem)" value={summary.byKind?.redeem} />
       </div>
 
-      {/* 활동자산 레이더 (한글 라벨) */}
+      {/* ✅ 활동자산 레이더 (booth_targets 가중치 반영) */}
       <section className="rounded-2xl border p-4">
         <div className="font-semibold mb-3">활동자산</div>
         <div style={{ width: "100%", height: 320 }}>
@@ -143,13 +131,13 @@ if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
               <PolarGrid />
               <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
               <PolarRadiusAxis />
-              <Radar dataKey="total" /> 
+              <Radar dataKey="total" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
             </RadarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* 최근 활동: 2개 (부스명 표시) */}
+      {/* 최근 활동: 부스명 표시 */}
       <section className="rounded-2xl border p-4">
         <div className="font-semibold mb-2">최근 활동</div>
         {list.length === 0 ? (
@@ -163,4 +151,3 @@ if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
     </main>
   );
 }
-
