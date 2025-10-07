@@ -23,6 +23,7 @@ function LoginBody() {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
   const [cooldown, setCooldown] = useState(0);
+  const [isSending, setIsSending] = useState(false); // 전송중 표시 / 중복 클릭 방지 
 
   // 이미 로그인된 상태면 프로필 상태에 따라 분기
   useEffect(() => {
@@ -43,20 +44,30 @@ function LoginBody() {
     return () => clearInterval(t);
   }, [cooldown]);
 
-  const request = async () => {
+const request = async () => {
+    if (isSending || cooldown > 0) return;
+    if (!phone) { setMsg("전화번호를 입력해주세요."); return; }
     setMsg("");
-    const r = await fetch("/api/otp/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
-    });
-    const j = await r.json();
-    if (j.ok) {
+    setIsSending(true);
+    try {
+      const r = await fetch("/api/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "요청 실패");
+
       setSent(true);
-      setCooldown(60);
-      setMsg("문자를 보냈습니다.");
-    } else {
-      setMsg(j.error || "요청 실패");
+      const wait = Number(j.resend_after ?? 60); // 서버가 내려주면 그 값 사용
+      setCooldown(wait);
+      setMsg("인증번호를 보냈습니다. 문자 메시지를 확인해 주세요.");
+      // 모바일 ‘눌림’ 피드백(선택)
+      try { navigator.vibrate?.(30); } catch {}
+    } catch (e) {
+      setMsg(e.message || "전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -100,11 +111,18 @@ function LoginBody() {
 
       {!sent ? (
         <button
-          className="w-full p-2 rounded bg-black text-white disabled:opacity-50"
           onClick={request}
-          disabled={cooldown > 0}
+          disabled={isSending || cooldown > 0 || !phone}
+          aria-busy={isSending ? "true" : "false"}
+          className={`w-full p-2 rounded bg-black text-white disabled:opacity-50 ${
+            isSending ? "animate-pulse" : ""
+          }`}
         >
-          {cooldown > 0 ? `${cooldown}s` : "코드 받기"}
+          {isSending
+            ? "발송 중…"
+            : cooldown > 0
+              ? `${cooldown}s 후 재전송`
+              : "인증번호 발송"}
         </button>
       ) : (
         <>

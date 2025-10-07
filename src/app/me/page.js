@@ -1,7 +1,7 @@
 // src/app/me/page.js
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer
@@ -59,21 +59,31 @@ export default function MyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <main className="p-6">불러오는 중…</main>;
-  if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
-
   const KR = {
     environment: "환경",
     social: "사회",
     economic: "경제",
     mental: "정신",
   };
-  const radarData = [
+
+  const radarData = useMemo(
+  () => ([
     { domain: "environment", total: summary.byCategory?.environment || 0 },
     { domain: "social",      total: summary.byCategory?.social      || 0 },
     { domain: "mental",      total: summary.byCategory?.mental      || 0 },
     { domain: "economic",    total: summary.byCategory?.economic    || 0 },
-  ] ;
+  ]),
+  [
+    summary.byCategory?.environment,
+    summary.byCategory?.social,
+    summary.byCategory?.mental,
+    summary.byCategory?.economic,
+  ]
+);
+
+
+if (loading) return <main className="p-6">불러오는 중…</main>;
+if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
 
   const fmt = (n) => `+${Number(n || 0)}`;
 
@@ -133,7 +143,7 @@ export default function MyPage() {
               <PolarGrid />
               <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
               <PolarRadiusAxis />
-              <Radar dataKey="total" />
+              <Radar dataKey="total" /> 
             </RadarChart>
           </ResponsiveContainer>
         </div>

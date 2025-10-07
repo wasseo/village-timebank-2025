@@ -16,7 +16,7 @@ export async function GET(req) {
 
   const { data: list, error: e1 } = await supabase
     .from("activities")
-    .select("id, booth_id, amount, category, kind, created_at,booths(name)") // ← booth name 조인
+    .select("id, booth_id, amount, category, kind, created_at,booths!inner(name)") // ← booth name 조인
     .eq("user_id", session.user.id)
     .order("created_at", { ascending:false })
     .limit(50);
