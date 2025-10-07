@@ -1,10 +1,11 @@
-// src/app/api/scan/route.js
+//src/app/api/scan/route.js
+
 import { NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { sessionOptions } from "@/lib/session";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs"; // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+export const runtime = "nodejs"; // iron-session은 edge 미지원
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -14,6 +15,44 @@ const admin = createClient(
 
 const RECENT_DUP_SECONDS = 20;
 const isDev = process.env.NODE_ENV !== "production";
+
+/** URL/문자열 정규화: 어떤 형태로 와도 booth_id/code를 최대한 뽑아낸다 */
+function normalizeScanInput({ booth_id_param, code_param }) {
+  let out = {
+    b: (booth_id_param || "").trim(),
+    code: (code_param || "").trim(),
+  };
+
+  // 이미 booth_id가 있으면 우선 사용
+  if (out.b) return out;
+
+  // code가 URL이면 /scan|/s|/booth 또는 쿼리에서 뽑는다
+  if (out.code && /^https?:\/\//i.test(out.code)) {
+    try {
+      const u = new URL(out.code);
+
+      // 쿼리 우선
+      const qpCode  = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
+      const qpBooth = (u.searchParams.get("b") || u.searchParams.get("booth_id") || "").trim();
+      if (qpBooth) return { b: qpBooth, code: "" };
+      if (qpCode)  return { b: "", code: qpCode };
+
+      // path 패턴
+      const mScan = u.pathname.match(/\/(scan|s)\/([A-Za-z0-9\-_.~]+)/);
+      if (mScan?.[2]) return { b: "", code: mScan[2] };
+
+      const mBooth = u.pathname.match(/\/booth\/([A-Za-z0-9\-_.~]+)/);
+      if (mBooth?.[1]) return { b: mBooth[1], code: "" };
+
+      // 그 외는 전체 URL을 code로 유지 (서버에서 code 매칭 시도)
+      return out;
+    } catch {
+      return out;
+    }
+  }
+
+  return out;
+}
 
 export async function POST(req) {
   const res = new NextResponse();
@@ -25,36 +64,30 @@ export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    // b(booth_id) 또는 code 모두 허용
-    let booth_id_param = (body?.b || body?.booth_id || "").trim();
-    let code_param     = (body?.code || body?.c || "").trim();
+    // 입력 파라미터 수집
+    const booth_id_param  = (body?.b || body?.booth_id || "").trim();
+    const code_param      = (body?.code || body?.c || "").trim();
     const client_event_id = body?.client_event_id ?? body?.e ?? null;
 
-    /* ✅ [추가] code가 URL인 경우 /scan/<slug> 추출 */
-    if (code_param && /^https?:\/\//i.test(code_param)) {
-      try {
-        const u = new URL(code_param);
-        const m = u.pathname.match(/\/scan\/([A-Za-z0-9\-_.~]+)/);
-        if (m?.[1]) code_param = m[1];
-      } catch {
-        // URL 파싱 실패시 무시
-      }
-    }
+    // ✅ 정규화
+    const norm = normalizeScanInput({ booth_id_param, code_param });
+    const boothIdForQuery = norm.b;
+    const codeForQuery    = norm.code;
 
-    if (!booth_id_param && !code_param) {
+    if (!boothIdForQuery && !codeForQuery) {
       return NextResponse.json(
         { ok: false, error: "booth_id(b) 또는 code 가 필요합니다." },
         { status: 400, headers: res.headers }
       );
     }
 
-    // 1) 부스 조회
+    // 1) 부스 조회 (booth_id 우선 → 없으면 code 매칭)
     let boothRow = null;
-    if (booth_id_param) {
+    if (boothIdForQuery) {
       const { data, error } = await admin
         .from("booths")
         .select("id, kind, amount, is_active")
-        .eq("id", booth_id_param)
+        .eq("id", boothIdForQuery)
         .maybeSingle();
       if (error) throw error;
       boothRow = data;
@@ -62,7 +95,7 @@ export async function POST(req) {
       const { data, error } = await admin
         .from("booths")
         .select("id, kind, amount, is_active")
-        .eq("code", code_param)
+        .eq("code", codeForQuery)
         .maybeSingle();
       if (error) throw error;
       boothRow = data;
@@ -85,7 +118,7 @@ export async function POST(req) {
     const amount = Number(boothRow.amount || 0);
     const kind   = boothRow.kind === "redeem" ? "redeem" : "earn";
 
-    // 2) 최근 중복 방지
+    // 2) 최근 중복 방지 (동일 부스에 연속 스캔)
     const sinceIso = new Date(Date.now() - RECENT_DUP_SECONDS * 1000).toISOString();
     const { data: recentDup, error: dupErr } = await admin
       .from("activities")
@@ -102,7 +135,7 @@ export async function POST(req) {
       );
     }
 
-    // 3) 멱등성 체크
+    // 3) 멱등성(클라이언트 이벤트 ID)
     if (client_event_id) {
       const { data: existed, error: existErr } = await admin
         .from("activities")
@@ -119,7 +152,7 @@ export async function POST(req) {
       }
     }
 
-    // 4) insert (호환성을 위해 event_id도 함께 기록)
+    // 4) insert (호환: event_id에도 동일 값 표시)
     const payload = {
       user_id: session.user.id,
       booth_id: boothRow.id,
@@ -136,6 +169,7 @@ export async function POST(req) {
       .maybeSingle();
 
     if (insErr) {
+      // unique 위반(멱등) 방어
       if ((insErr.code === "23505" || `${insErr.message}`.includes("duplicate")) && client_event_id) {
         return NextResponse.json(
           { ok: true, duplicated: true, debug: isDev ? { step: "unique-violation" } : undefined },

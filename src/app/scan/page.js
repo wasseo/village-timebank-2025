@@ -4,34 +4,26 @@
 import { useEffect, useRef, useState } from "react";
 import QrScanner from "qr-scanner";
 
-/* --------- QrScanner Worker 설정 (Next/Webpack 호환 + 폴백) --------- */
+// QrScanner worker 경로 (public 폴백 포함)
 try {
   // eslint-disable-next-line import/no-webpack-loader-syntax
   // @ts-ignore
-  import("qr-scanner/qr-scanner-worker.min.js?worker&url").then((m) => {
-    if (m?.default) QrScanner.WORKER_PATH = m.default;
-  }).catch(() => {
-    QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js";
-  });
+  import("qr-scanner/qr-scanner-worker.min.js?worker&url")
+    .then((m) => { if (m?.default) QrScanner.WORKER_PATH = m.default; })
+    .catch(() => { QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js"; });
 } catch {
   QrScanner.WORKER_PATH = "/qr-scanner-worker.min.js";
 }
 
-/* ---------- 로컬 스토리지 헬퍼 ---------- */
+/* ---------- 로컬 스토리지 ---------- */
 const PENDING_KEY = "pendingScan";
 const savePending = (p) => { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch {} };
 const readPending  = () => { try { const v = localStorage.getItem(PENDING_KEY); return v ? JSON.parse(v) : null; } catch { return null } };
 const clearPending = () => { try { localStorage.removeItem(PENDING_KEY); } catch {} };
 
-/* ---------- URL 파라미터/경로 → payload 매핑 ---------- */
+/* ---------- URL → payload ---------- */
 function pickPayloadFromLocation() {
   if (typeof window === "undefined") return null;
-
-  // /scan/<slug> 또는 /s/<slug> 경로 지원
-  const path = window.location.pathname.replace(/^\/+/, "");
-  const m = path.match(/^(scan|s)\/([A-Za-z0-9\-_.~]+)/);
-  if (m?.[2]) return { code: m[2] };
-
   const sp = new URLSearchParams(window.location.search);
   const code = (sp.get("code") || sp.get("c") || "").trim();
   const b    = (sp.get("b") || sp.get("booth_id") || "").trim();
@@ -44,12 +36,12 @@ function pickPayloadFromLocation() {
   return payload;
 }
 
-/* ---------- 텍스트(any) → payload 파싱 ---------- */
+/* ---------- text(any) → payload ---------- */
 function parseAnyText(text) {
   const t = String(text || "").trim();
   if (!t) return null;
 
-  // 1) 우리 규격 tb://booth/<id>?k=earn&amt=2
+  // tb://booth/xxx
   if (t.startsWith("tb://")) {
     try {
       const u = new URL(t);
@@ -61,19 +53,16 @@ function parseAnyText(text) {
       return { b: boothId, kind: k === "redeem" ? "redeem" : "earn", amount: Math.max(1, amt) };
     } catch {}
   }
-
-  // 2) booth-xxx 직접 코드
+  // booth-xxx
   if (/^booth[-_]/i.test(t)) return { b: t };
 
-  // 3) http(s) URL일 때: /scan/<slug> 또는 ?code=… 추출
+  // http(s) URL → /scan/<slug> 또는 ?code= 추출 시도
   if (/^https?:\/\//i.test(t)) {
     try {
       const u = new URL(t);
-
-      // (a) 쿼리파라미터 우선
-      const qpCode = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
+      const qpCode  = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
       const qpBooth = (u.searchParams.get("b") || u.searchParams.get("booth_id") || "").trim();
-      const qpE = (u.searchParams.get("e") || "").trim();
+      const qpE     = (u.searchParams.get("e") || "").trim();
       if (qpCode || qpBooth) {
         const payload = {};
         if (qpCode) payload.code = qpCode;
@@ -81,27 +70,17 @@ function parseAnyText(text) {
         if (qpE) payload.client_event_id = qpE;
         return payload;
       }
-
-      // (b) /scan/<slug> 또는 /s/<slug> 형태에서 slug 추출
       const m2 = u.pathname.match(/\/(scan|s)\/([A-Za-z0-9\-_.~]+)/);
       if (m2?.[2]) return { code: m2[2] };
-
-      // (c) /booth/<id> 형태 지원
       const m3 = u.pathname.match(/\/booth\/([A-Za-z0-9\-_.~]+)/);
       if (m3?.[1]) return { b: m3[1] };
-
-      // (d) 그 외 URL은 서버에서 후처리할 수 있게 전체를 code로
-      return { code: t };
-    } catch {
-      // URL 파싱 실패 시 아래 일반 폴백으로
-    }
+      return { code: t }; // 최후수단: 전체 URL을 code로 (서버 정규화)
+    } catch {}
   }
-
-  // 4) 일반 문자열은 code로 처리
   return { code: t };
 }
 
-/* ---------- iOS / Safari / PWA(standalone) 감지 ---------- */
+/* ---------- iOS 감지 ---------- */
 function getIOSContext() {
   if (typeof window === "undefined") return { isIOS: false, isStandalone: false, isSafari: false };
   const ua = navigator.userAgent || "";
@@ -115,20 +94,21 @@ export default function ScanPage() {
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
 
-  const [torch, setTorch] = useState(false);
-  const [msg, setMsg] = useState("카메라 준비 중…");
+  const [msg, setMsg] = useState("카메라/링크 준비 중…");
   const [last, setLast] = useState(null);
   const [manual, setManual] = useState("");
 
-  // 카메라 선택/상태
-  const [devices, setDevices] = useState([]); // [{id, label}]
-  const [deviceId, setDeviceId] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // iOS UX 안내
+  // iOS 안내
   const [{ isIOS, isStandalone, isSafari }, setIOSCtx] = useState({ isIOS: false, isStandalone: false, isSafari: true });
 
-  // 전송 가드: 짧은 쿨타임 & 중복 전송 방지
+  // 스캐너 ON/OFF (기본 OFF, 사용자 탭으로만 ON)
+  const [webQrOn, setWebQrOn] = useState(false);
+  const [torch, setTorch] = useState(false);
+  const [devices, setDevices] = useState([]);
+  const [deviceId, setDeviceId] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // 가드
   const sendingRef = useRef(false);
   const [cooldown, setCooldown] = useState(0);
   useEffect(() => {
@@ -137,11 +117,10 @@ export default function ScanPage() {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  // 디버그(스캔 에러 표시용)
   const [debug, setDebug] = useState("");
   const [showDebug, setShowDebug] = useState(false);
 
-  // 로그인 후 자동복귀 처리
+  // 로그인 후 자동복귀
   useEffect(() => {
     setIOSCtx(getIOSContext());
     (async () => {
@@ -159,49 +138,36 @@ export default function ScanPage() {
     })();
   }, []);
 
-  // 장치 목록 새로고침
-  const refreshDevices = async () => {
-    try {
-      const cams = await QrScanner.listCameras(true); // [{id, label}]
-      setDevices(cams);
-      const saved = localStorage.getItem("vtb:lastDeviceId");
-      if (saved && cams.some(c => c.id === saved)) {
-        setDeviceId(saved);
-      } else if (cams.length && !deviceId) {
-        setDeviceId(cams[0].id);
-      }
-    } catch (e) {
-      console.warn("카메라 목록 불러오기 실패", e);
-    }
-  };
-
-  // 스캐너 시작
+  // URL 파라미터 즉시 처리 (?code=)
   useEffect(() => {
-    let active = true;
-
     (async () => {
       const fromUrl = pickPayloadFromLocation();
-      if (fromUrl) {
-        const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
-        if (!me?.user?.id) {
-          savePending(fromUrl);
-          location.href = `/login?next=${encodeURIComponent("/scan?auto=1")}`;
-          return;
-        }
-        setMsg("전송 중…");
-        await sendToServer(fromUrl);
+      if (!fromUrl) return;
+      const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
+      if (!me?.user?.id) {
+        savePending(fromUrl);
+        location.href = `/login?next=${encodeURIComponent("/scan?auto=1")}`;
         return;
       }
+      setMsg("전송 중…");
+      await sendToServer(fromUrl);
+    })();
+  }, []);
 
+  // 스캐너 시작/정리 (webQrOn일 때만)
+  useEffect(() => {
+    if (!webQrOn) return;
+
+    let active = true;
+    (async () => {
       try {
         setLoading(true);
-
         const scanner = new QrScanner(
           videoRef.current,
           (result) => {
             if (!active) return;
             const text = result?.data || result;
-            if (sendingRef.current || cooldown > 0) return; // 중복 방지
+            if (sendingRef.current || cooldown > 0) return;
             handleScanResult(text);
           },
           {
@@ -209,102 +175,48 @@ export default function ScanPage() {
             returnDetailedScanResult: true,
             highlightScanRegion: true,
             highlightCodeOutline: true,
-
-            // ▼ 디코딩 튜닝
             maxScansPerSecond: 8,
             preferredResolution: 1280,
             // @ts-ignore
             tryInverted: true,
-
-            onDecodeError: (e) => {
-              if (showDebug) setDebug(String(e?.message || e || ""));
-            },
+            onDecodeError: (e) => { if (showDebug) setDebug(String(e?.message || e || "")); },
           }
         );
         scannerRef.current = scanner;
-
-        await scanner.start();           // 권한 요청 + 비디오 attach
-        await refreshDevices();          // 라벨 활성화 후 목록 로드
-
+        await scanner.start();
+        const cams = await QrScanner.listCameras(true);
+        setDevices(cams);
         const saved = localStorage.getItem("vtb:lastDeviceId");
-        if (saved) {
-          try {
-            await scanner.setCamera(saved);
-            setDeviceId(saved);
-          } catch (e) {
-            console.warn("저장된 카메라 전환 실패 → 기본 유지", e);
-          }
+        if (saved && cams.some(c => c.id === saved)) {
+          await scanner.setCamera(saved);
+          setDeviceId(saved);
         }
-
-        setMsg("QR을 화면 중앙에 맞춰주세요.");
+        setMsg("웹 스캔(베타) 사용 중: QR을 화면 중앙에 맞춰주세요.");
       } catch (e) {
         console.warn(e);
-        setMsg("카메라 접근이 거부되었거나 사용할 수 없습니다.");
+        setMsg("브라우저에서 카메라 사용이 불가합니다. 기본 카메라 앱으로 스캔하세요.");
       } finally {
         setLoading(false);
       }
     })();
 
-    const onDeviceChange = () => refreshDevices();
-    navigator.mediaDevices?.addEventListener?.("devicechange", onDeviceChange);
-
     return () => {
       active = false;
-      scannerRef.current?.stop();
-      scannerRef.current?.destroy();
-      navigator.mediaDevices?.removeEventListener?.("devicechange", onDeviceChange);
-    };
-  }, [cooldown, showDebug]);
-
-  // 카메라 전환
-  const handleChangeDevice = async (id) => {
-    setDeviceId(id || null);
-    if (!scannerRef.current) return;
-    try {
-      setLoading(true);
-      setMsg("카메라 전환 중…");
-      await scannerRef.current.setCamera(id); // deviceId 또는 'environment'/'user'
-      if (id) localStorage.setItem("vtb:lastDeviceId", id);
-      else localStorage.removeItem("vtb:lastDeviceId");
-      setMsg("QR을 화면 중앙에 맞춰주세요.");
-    } catch (e) {
-      console.warn("카메라 전환 실패", e);
-      setMsg("선택한 카메라를 사용할 수 없습니다. 다른 장치를 선택해 주세요.");
+      try { scannerRef.current?.stop(); } catch {}
+      try { scannerRef.current?.destroy(); } catch {}
       try {
-        await scannerRef.current.setCamera("environment");
-        setMsg("후면 카메라로 폴백했습니다. 다시 시도해 주세요.");
-      } catch {
-        try {
-          await scannerRef.current.setCamera("user");
-          setMsg("전면 카메라로 폴백했습니다. 다시 시도해 주세요.");
-        } catch {
-          setMsg("폴백 실패: 브라우저 권한/HTTPS/다른 앱 점유를 확인해 주세요.");
-        }
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+        const stream = videoRef.current?.srcObject;
+        stream?.getTracks?.().forEach(t => t.stop());
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } catch {}
+    };
+  }, [webQrOn, cooldown, showDebug]);
 
-  // 플래시 토글
-  async function toggleTorch() {
-    try {
-      const has = await scannerRef.current?.hasFlash();
-      if (!has) return alert("해당 기기는 플래시를 지원하지 않습니다.");
-      if (torch) await scannerRef.current?.turnFlashOff();
-      else await scannerRef.current?.turnFlashOn();
-      setTorch(!torch);
-    } catch {
-      alert("플래시 제어를 사용할 수 없습니다.");
-    }
-  }
-
-  // --- 추가: 카메라/스캐너 정리 후 외부 이동 ---
+  // 외부 링크 이동 시 스캐너 정리
   async function navigateExternal(url) {
     setMsg("링크로 이동 중…");
     sendingRef.current = true;
     setCooldown(2);
-
     try { await scannerRef.current?.turnFlashOff?.(); } catch {}
     try { await scannerRef.current?.stop?.(); } catch {}
     try { scannerRef.current?.destroy?.(); } catch {}
@@ -313,81 +225,59 @@ export default function ScanPage() {
       stream?.getTracks?.().forEach(t => t.stop());
       if (videoRef.current) videoRef.current.srcObject = null;
     } catch {}
-
     const target = String(url);
     setTimeout(() => { window.location.replace(target); }, 50);
     setTimeout(() => {
       if (document.visibilityState === "visible") {
         const a = document.createElement("a");
-        a.href = target;
-        a.target = "_self";
-        a.rel = "noreferrer";
-        document.body.appendChild(a);
-        a.click();
+        a.href = target; a.target = "_self"; a.rel = "noreferrer";
+        document.body.appendChild(a); a.click();
       }
     }, 1000);
   }
 
-  // --- 스캔 처리: 외부 링크면 정리 후 이동, 아니면 서버 전송 ---
+  // 스캔 처리
   async function handleScanResult(text) {
     const raw = String(text || "").trim();
-    if (!raw) {
-      setMsg("QR 형식이 올바르지 않습니다.");
-      return;
-    }
-
-    // http/https 링크면 스캐너 정리 후 이동 (네이버 단축링크 포함)
+    if (!raw) { setMsg("QR 형식이 올바르지 않습니다."); return; }
     if (/^https?:\/\//i.test(raw)) {
-      await navigateExternal(raw);
+      await navigateExternal(raw);   // 네이버 단축링크 등
       return;
     }
-
-    // 그 외: 우리 규격 파싱(tb://, booth-xxx, 일반 code 문자열)
     const payload = parseAnyText(raw);
-    if (!payload) {
-      setMsg("QR 형식이 올바르지 않습니다.");
-      return;
-    }
+    if (!payload) { setMsg("QR 형식이 올바르지 않습니다."); return; }
 
-    // 로그인 확인
     const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
     if (!me?.user?.id) {
       savePending(payload);
       location.href = `/login?next=${encodeURIComponent("/scan?auto=1")}`;
       return;
     }
-
     setMsg("전송 중…");
     await sendToServer(payload);
   }
 
-  // 서버 전송(멱등 + 쿨타임)
+  // 서버 전송
   async function sendToServer(payload) {
-    if (sendingRef.current || cooldown > 0) return; // 중복 방지
+    if (sendingRef.current || cooldown > 0) return;
     sendingRef.current = true;
-    setCooldown(2); // 2초 쿨다운
+    setCooldown(2);
     setLast(payload);
-
     try {
       const r = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, client_event_id: crypto.randomUUID?.() }),
       });
-
-      if (r.status === 429) { // 레이트리밋 → 짧게 대기 후 1회 재시도
+      if (r.status === 429) {
         await new Promise(res => setTimeout(res, 500));
         sendingRef.current = false;
         return await sendToServer(payload);
       }
-
       const j = await r.json().catch(() => ({}));
       if (j.ok) {
         clearPending();
-        setMsg(j.duplicated
-          ? "이미 처리된 QR입니다. /me로 이동합니다…"
-          : "활동이 추가되었습니다. /me로 이동합니다…"
-        );
+        setMsg(j.duplicated ? "이미 처리된 QR입니다. /me로 이동합니다…" : "활동이 추가되었습니다. /me로 이동합니다…");
         setTimeout(() => (location.href = "/me"), 900);
       } else {
         setMsg(`실패: ${j.error || "알 수 없는 오류"}`);
@@ -411,115 +301,130 @@ export default function ScanPage() {
     }
   }
 
-  /* -------------------- UI -------------------- */
+  // 토글 시 안전 정리
+  function toggleWebScanner() {
+    if (webQrOn) {
+      try { scannerRef.current?.stop(); } catch {}
+      try { scannerRef.current?.destroy(); } catch {}
+      try {
+        const stream = videoRef.current?.srcObject;
+        stream?.getTracks?.().forEach(t => t.stop());
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } catch {}
+      setTorch(false);
+      setMsg("웹 스캔을 끔. 기본 카메라로 스캔하세요.");
+      setWebQrOn(false);
+    } else {
+      setWebQrOn(true);
+    }
+  }
+
   return (
     <div className="p-4 space-y-4 max-w-md mx-auto">
       <h1 className="text-xl font-bold">QR 스캔</h1>
 
-      {/* iPhone 최적화 안내 */}
+      {/* 안내 (iPhone/PWA 등) */}
       {isIOS && (
         <div className="text-xs rounded-lg border p-3 bg-amber-50 border-amber-200 text-amber-900">
-          {!isSafari && (
-            <p>iPhone에서는 <b>Safari 브라우저</b>에서 카메라 스캔이 가장 안정적으로 작동합니다.</p>
-          )}
-          {isStandalone && (
-            <p className="mt-1">현재 <b>홈 화면(PWA) 모드</b>로 보이는 것 같아요. 카메라 권한 팝업이 표시되지 않을 수 있습니다. 문제가 있다면 Safari에서 직접 열어주세요.</p>
-          )}
+          {!isSafari && <p>iPhone에서는 <b>Safari</b>에서 가장 안정적입니다.</p>}
+          {isStandalone && <p className="mt-1">홈 화면(PWA) 모드에서는 카메라 권한 팝업이 제한될 수 있어요.</p>}
         </div>
       )}
 
-      {/* 카메라 선택/제어 + 디버그 토글 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm text-gray-600">카메라</label>
-        <select
-          className="border rounded px-3 py-2"
-          value={deviceId || ""}
-          onChange={(e) => handleChangeDevice(e.target.value || null)}
-          disabled={loading}
-        >
-          <option value="">자동 선택(후면 우선)</option>
-          {devices.map((d, i) => (
-            <option key={d.id || `cam-${i}`} value={d.id}>
-              {d.label || `카메라 ${i + 1}`}
-            </option>
-          ))}
-        </select>
-        <button
-          className="border rounded px-3 py-2"
-          onClick={() => handleChangeDevice(deviceId || "")}
-          disabled={loading}
-        >
-          다시 시도
-        </button>
-        <button className="border rounded px-3 py-2" onClick={toggleTorch}>
-          {torch ? "플래시 끄기" : "플래시 켜기"}
-        </button>
-        <label className="text-xs flex items-center gap-1 ml-auto cursor-pointer select-none">
-          <input type="checkbox" checked={showDebug} onChange={(e)=>setShowDebug(e.target.checked)} />
-          디코딩 디버그
-        </label>
-
-        {cooldown > 0 && (
-          <span className="text-xs px-2 py-1 rounded border bg-gray-50 text-gray-700">
-            {cooldown}s 대기 중…
-          </span>
-        )}
+      {/* 기본 흐름: OS 카메라로 스캔 */}
+      <div className="rounded-lg border p-3 space-y-2 bg-gray-50">
+        <p className="text-sm">
+          <b>추천:</b> 휴대폰 <b>기본 카메라 앱</b>으로 QR을 찍으면 자동으로 이 페이지(/scan?code=)로 연결되어 적립됩니다.
+        </p>
+        <div className="flex gap-2">
+          <label className="border rounded px-3 py-2 cursor-pointer">
+            이미지에서 스캔
+            <input type="file" accept="image/*" className="hidden" onChange={onFile} />
+          </label>
+          <button
+            className="border rounded px-3 py-2"
+            onClick={async () => {
+              try {
+                const txt = await navigator.clipboard.readText();
+                if (txt) await handleScanResult(txt);
+              } catch {
+                alert("클립보드 읽기 권한이 필요합니다. 직접 붙여넣기 해주세요.");
+              }
+            }}
+          >
+            클립보드에서 붙여넣기
+          </button>
+        </div>
       </div>
 
-      {/* 카메라 프리뷰 */}
-      <div className="relative rounded-2xl overflow-hidden border">
-        <video
-          ref={videoRef}
-          className="w-full aspect-[3/4] object-cover bg-black"
-          muted
-          playsInline
-          autoPlay
-        />
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-white bg-black/30">
-            카메라 로딩 중…
-          </div>
-        )}
-      </div>
-
-      {/* 액션 버튼들 */}
-      <div className="flex gap-2">
-        <label className="border rounded px-3 py-2 cursor-pointer">
-          이미지에서 스캔
-          <input type="file" accept="image/*" className="hidden" onChange={onFile} />
-        </label>
-        <a href="/me" className="border rounded px-3 py-2 inline-flex items-center">내 활동</a>
-      </div>
-
-      {/* 수동 입력 백업 */}
+      {/* 수동 입력 */}
       <div className="flex gap-2">
         <input
           value={manual}
           onChange={(e) => setManual(e.target.value)}
-          placeholder="코드 또는 booth-xxx 또는 tb://booth/.."
+          placeholder="코드 또는 URL 붙여넣기"
           className="border rounded px-3 py-2 w-full"
         />
         <button
           className="border rounded px-3 py-2"
-          onClick={() => (sendingRef.current || cooldown > 0) ? null : handleScanResult(manual)}
-          disabled={cooldown > 0}
+          onClick={() => handleScanResult(manual)}
         >
           입력 처리
         </button>
       </div>
 
-      {/* 상태/마지막 처리 + 디버그 */}
+      {/* 웹 스캔 (베타) 토글 */}
+      <div className="flex items-center gap-2">
+        <button className="border rounded px-3 py-2" onClick={toggleWebScanner}>
+          {webQrOn ? "웹 스캔 끄기(베타)" : "웹 스캔 켜기(베타)"}
+        </button>
+        {webQrOn && (
+          <>
+            <button className="border rounded px-3 py-2" onClick={async () => {
+              try {
+                const has = await scannerRef.current?.hasFlash();
+                if (!has) return alert("이 기기는 플래시를 지원하지 않습니다.");
+                if (torch) await scannerRef.current?.turnFlashOff();
+                else await scannerRef.current?.turnFlashOn();
+                setTorch(!torch);
+              } catch { alert("플래시 제어를 사용할 수 없습니다."); }
+            }}>
+              {torch ? "플래시 끄기" : "플래시 켜기"}
+            </button>
+            <label className="text-xs flex items-center gap-1 ml-auto cursor-pointer select-none">
+              <input type="checkbox" checked={showDebug} onChange={(e)=>setShowDebug(e.target.checked)} />
+              디코딩 디버그
+            </label>
+          </>
+        )}
+      </div>
+
+      {/* 카메라 프리뷰 (웹 스캔이 켜졌을 때만) */}
+      {webQrOn && (
+        <div className="relative rounded-2xl overflow-hidden border">
+          <video
+            ref={videoRef}
+            className="w-full aspect-[3/4] object-cover bg-black"
+            muted
+            playsInline
+            autoPlay
+          />
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-white bg-black/30">
+              카메라 로딩 중…
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 상태 */}
       <div className="space-y-1">
         <div className="text-sm text-gray-600">{msg}</div>
         {last && (
-          <div className="text-xs text-gray-500 break-all">
-            마지막 처리: {JSON.stringify(last)}
-          </div>
+          <div className="text-xs text-gray-500 break-all">마지막 처리: {JSON.stringify(last)}</div>
         )}
         {showDebug && debug && (
-          <pre className="text-xs text-gray-500 whitespace-pre-wrap break-all border rounded p-2 bg-gray-50">
-            {debug}
-          </pre>
+          <pre className="text-xs text-gray-500 whitespace-pre-wrap break-all border rounded p-2 bg-gray-50">{debug}</pre>
         )}
       </div>
     </div>

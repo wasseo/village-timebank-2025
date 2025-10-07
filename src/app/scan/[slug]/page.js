@@ -10,9 +10,9 @@ export default function ScanSlugRedirectPage() {
 
   useEffect(() => {
     if (!slug) return;
-    // e 파라미터가 있으면 같이 넘김 (멱등성 등 유지용)
+    // e(멱등) 파라미터 있으면 유지
     const e = sp.get("e");
-    const qs = e ? `?code=${encodeURIComponent(slug)}&e=${encodeURIComponent(e)}` 
+    const qs = e ? `?code=${encodeURIComponent(slug)}&e=${encodeURIComponent(e)}`
                  : `?code=${encodeURIComponent(slug)}`;
     router.replace(`/scan${qs}`);
   }, [slug]);
@@ -23,4 +23,5 @@ export default function ScanSlugRedirectPage() {
     </div>
   );
 }
+
 
