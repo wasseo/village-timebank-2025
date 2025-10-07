@@ -1,3 +1,5 @@
+//src/app/api/activities/route.js
+
 import { NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { sessionOptions } from "@/lib/session";
@@ -14,7 +16,7 @@ export async function GET(req) {
 
   const { data: list, error: e1 } = await supabase
     .from("activities")
-    .select("id, booth_id, amount, category, kind, created_at") // ← kind!
+    .select("id, booth_id, amount, category, kind, created_at,booths(name)") // ← booth name 조인
     .eq("user_id", session.user.id)
     .order("created_at", { ascending:false })
     .limit(50);
