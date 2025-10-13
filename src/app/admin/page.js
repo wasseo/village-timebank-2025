@@ -106,7 +106,7 @@ export default function AdminDashboardPage() {
     </ol>
   );
 
-  const rangeLabel = range === "day1" ? "테스트~10/18" : "10/19~";
+  const rangeLabel = range === "day1" ? "10/18" : "10/19";
 
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] px-6 py-8">
