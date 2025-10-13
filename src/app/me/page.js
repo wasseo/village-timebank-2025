@@ -1,3 +1,4 @@
+// src/app/me/page.js
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,6 +16,7 @@ export default function MyPage() {
     byCategory: { environment: 0, social: 0, economic: 0, mental: 0 },
   });
   const [list, setList] = useState([]);
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -26,8 +28,11 @@ export default function MyPage() {
           location.href = `/login?next=${next}`;
           return;
         }
+        // 이름(있으면) 표시용
+        const metaName = me?.user?.user_metadata?.name || me?.profile?.name || "";
+        setUserName(metaName);
 
-        // 활동 요약 + 최근 활동(서버에서 부스명까지 조인됨)
+        // 활동 요약 + 최근 활동
         const acts = await fetch("/api/activities").then(r => r.json());
         if (!acts?.ok) throw new Error(acts?.error || "활동을 불러오지 못했습니다.");
 
@@ -48,7 +53,7 @@ export default function MyPage() {
     mental: "정신",
   };
 
-  // ✅ 레이더 데이터 메모화
+  // 레이더 데이터
   const radarData = useMemo(
     () => ([
       { domain: "environment", total: summary.byCategory?.environment || 0 },
@@ -64,19 +69,33 @@ export default function MyPage() {
     ]
   );
 
-  if (loading) return <main className="p-6">불러오는 중…</main>;
-  if (err) return <main className="p-6 text-red-500">에러: {err}</main>;
+  if (loading) return <main className="min-h-screen bg-[#FFF7E3] p-6">불러오는 중…</main>;
+  if (err) return <main className="min-h-screen bg-[#FFF7E3] p-6 text-red-600">에러: {err}</main>;
 
-  const fmt = (n) => `+${Number(n || 0)}`;
+  const fmtPlus = (n) => `+${Number(n || 0)}`;
 
-  const StatCard = ({ title, value }) => (
-    <div className="rounded-2xl border p-4">
-      <div className="text-sm text-gray-600 mb-1">{title}</div>
-      <div className="text-2xl font-bold">{fmt(value)}</div>
-    </div>
-  );
+  const StatCard = ({ title, value, tone = "blue", sub }) => {
+    const tones = {
+      blue: { ring: "ring-[#2843D1]/30", iconBg: "bg-[#2843D1]/10", icon: "text-[#2843D1]" },
+      green:{ ring: "ring-[#27A36D]/30", iconBg: "bg-[#27A36D]/10", icon: "text-[#27A36D]" },
+      lilac:{ ring: "ring-[#8F8AE6]/30", iconBg: "bg-[#8F8AE6]/10", icon: "text-[#8F8AE6]" },
+    }[tone];
 
-  // ✅ 부스명은 booths(name) 조인값 → booth_name(이전호환) → booth_id
+    return (
+      <div className={`rounded-2xl bg-white ring-1 ${tones.ring} p-4 shadow-sm`}>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex w-9 h-9 rounded-full items-center justify-center ${tones.iconBg}`}>
+            <span className={`text-lg ${tones.icon}`}>●</span>
+          </span>
+          <div className="text-sm text-[#64748B]">{title}</div>
+        </div>
+        <div className="mt-2 text-3xl font-extrabold text-[#1F2C5D]">{Number(value || 0)}</div>
+        {sub ? <div className="text-xs text-[#223D8F] mt-1">{sub}</div> : null}
+      </div>
+    );
+  };
+
+  // 부스명 표시
   const ActivityItem = ({ a }) => {
     const boothName = a?.booths?.name ?? a?.booth_name ?? a?.booth_id;
     const d = new Date(a.created_at);
@@ -87,14 +106,14 @@ export default function MyPage() {
         });
     const kindLabel = a.kind === "redeem" ? "교환" : "적립";
     return (
-      <li className="flex items-center justify-between py-2">
+      <li className="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-[#2843D1]/5 transition">
         <div className="text-sm">
-          <div className="font-medium">
-            {boothName} <span className="text-gray-500">· {kindLabel}</span>
+          <div className="font-medium text-[#1F2C5D]">
+            {boothName} <span className="text-[#64748B]">· {kindLabel}</span>
           </div>
-          <div className="text-gray-500">{when}</div>
+          <div className="text-[#94A3B8]">{when}</div>
         </div>
-        <div className="font-mono">{fmt(a.amount)}</div>
+        <div className="font-mono text-[#27A36D]">{fmtPlus(a.amount)}</div>
       </li>
     );
   };
@@ -105,48 +124,59 @@ export default function MyPage() {
   };
 
   return (
-    <main className="p-6 space-y-6 max-w-3xl mx-auto">
-      {/* 헤더 + 버튼 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">내 활동</h1>
+    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
+      {/* 상단 인사 & 액션 */}
+      <div className="max-w-3xl mx-auto px-6 pt-7 pb-2 flex items-center justify-between">
+        <h1 className="text-[28px] font-extrabold tracking-tight">
+          안녕하세요{userName ? `, ${userName}님` : "!"}
+        </h1>
         <div className="flex gap-2">
-          <Link href="/scan" className="border rounded px-3 py-2">QR 스캔</Link>
-          <button className="border rounded px-3 py-2" onClick={logout}>로그아웃</button>
+          <Link href="/scan" className="rounded-xl px-4 py-2 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95">
+            QR 스캔
+          </Link>
+          <button onClick={logout} className="rounded-xl px-4 py-2 bg-white ring-1 ring-[#2843D1]/30 shadow-sm hover:bg-[#2843D1]/5">
+            로그아웃
+          </button>
         </div>
       </div>
 
-      {/* 합계 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="총 합계" value={summary.total} />
-        <StatCard title="적립(Earn)" value={summary.byKind?.earn} />
-        <StatCard title="교환(Redeem)" value={summary.byKind?.redeem} />
-      </div>
+      {/* 요약 카드 */}
+      <section className="max-w-3xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+        <StatCard title="적립" value={summary.byKind?.earn} tone="green" />
+        <StatCard title="교환" value={summary.byKind?.redeem} tone="blue" />
+        <StatCard title="총 마음포인트" value={summary.total} tone="lilac" />
+      </section>
 
-      {/* ✅ 활동자산 레이더 (booth_targets 가중치 반영) */}
-      <section className="rounded-2xl border p-4">
-        <div className="font-semibold mb-3">활동자산</div>
-        <div style={{ width: "100%", height: 320 }}>
-          <ResponsiveContainer>
-            <RadarChart data={radarData}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
-              <PolarRadiusAxis />
-              <Radar dataKey="total" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
-            </RadarChart>
-          </ResponsiveContainer>
+      {/* 활동자산 레이더 */}
+      <section className="max-w-3xl mx-auto px-6 mt-6">
+        <div className="rounded-3xl bg-white ring-1 ring-[#A1E1A4]/30 p-5 shadow-sm">
+          <div className="font-semibold mb-3">활동자산</div>
+          <div style={{ width: "100%", height: 320 }}>
+            <ResponsiveContainer>
+              <RadarChart data={radarData}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
+                <PolarRadiusAxis />
+                {/* 외곽은 파랑, 채움은 연녹(디자인 톤) */}
+                <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.35} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </section>
 
-      {/* 최근 활동: 부스명 표시 */}
-      <section className="rounded-2xl border p-4">
-        <div className="font-semibold mb-2">최근 활동</div>
-        {list.length === 0 ? (
-          <div className="text-gray-500 text-sm">활동이 아직 없습니다.</div>
-        ) : (
-          <ul>
-            {list.map((a) => <ActivityItem key={a.id} a={a} />)}
-          </ul>
-        )}
+      {/* 최근 활동 */}
+      <section className="max-w-3xl mx-auto px-6 mt-6 mb-10">
+        <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-5 shadow-sm">
+          <div className="font-semibold mb-2">최근 활동</div>
+          {list.length === 0 ? (
+            <div className="text-[#94A3B8] text-sm">활동이 아직 없습니다.</div>
+          ) : (
+            <ul className="divide-y divide-[#E2E8F0]">
+              {list.map((a) => <ActivityItem key={a.id} a={a} />)}
+            </ul>
+          )}
+        </div>
       </section>
     </main>
   );
