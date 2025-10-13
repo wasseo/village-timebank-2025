@@ -132,7 +132,7 @@ export default function MyPage() {
         </h1>
         <div className="flex gap-2">
           <Link href="/scan" className="rounded-xl px-4 py-2 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95">
-            QR 스캔
+            부스 입력
           </Link>
           <button onClick={logout} className="rounded-xl px-4 py-2 bg-white ring-1 ring-[#2843D1]/30 shadow-sm hover:bg-[#2843D1]/5">
             로그아웃
@@ -144,7 +144,7 @@ export default function MyPage() {
       <section className="max-w-3xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
         <StatCard title="적립" value={summary.byKind?.earn} tone="green" />
         <StatCard title="교환" value={summary.byKind?.redeem} tone="blue" />
-        <StatCard title="총 마음포인트" value={summary.total} tone="lilac" />
+        <StatCard title="총 마음포인트 (적립 + 교환)" value={summary.total} tone="lilac" />
       </section>
 
       {/* 활동자산 레이더 */}
