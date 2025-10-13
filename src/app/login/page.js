@@ -4,7 +4,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export const dynamic = "force-dynamic"; // 프리렌더/CSR bail-out 관련 빌드 오류 방지
+export const dynamic = "force-dynamic"; // CSR 강제
 
 export default function LoginPage() {
   return (
@@ -23,9 +23,8 @@ function LoginBody() {
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState("");
   const [cooldown, setCooldown] = useState(0);
-  const [isSending, setIsSending] = useState(false); // 전송중 표시 / 중복 클릭 방지 
+  const [isSending, setIsSending] = useState(false);
 
-  // 이미 로그인된 상태면 프로필 상태에 따라 분기
   useEffect(() => {
     (async () => {
       try {
@@ -44,9 +43,9 @@ function LoginBody() {
     return () => clearInterval(t);
   }, [cooldown]);
 
-const request = async () => {
+  const request = async () => {
     if (isSending || cooldown > 0) return;
-    if (!phone) { setMsg("전화번호를 입력해주세요."); return; }
+    if (!phone) return setMsg("전화번호를 입력해주세요.");
     setMsg("");
     setIsSending(true);
     try {
@@ -59,13 +58,12 @@ const request = async () => {
       if (!r.ok || !j.ok) throw new Error(j.error || "요청 실패");
 
       setSent(true);
-      const wait = Number(j.resend_after ?? 60); // 서버가 내려주면 그 값 사용
+      const wait = Number(j.resend_after ?? 60);
       setCooldown(wait);
       setMsg("인증번호를 보냈습니다. 문자 메시지를 확인해 주세요.");
-      // 모바일 ‘눌림’ 피드백(선택)
-      try { navigator.vibrate?.(30); } catch {}
+      navigator.vibrate?.(30);
     } catch (e) {
-      setMsg(e.message || "전송에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      setMsg(e.message || "전송 실패. 잠시 후 다시 시도해주세요.");
     } finally {
       setIsSending(false);
     }
@@ -79,66 +77,103 @@ const request = async () => {
       body: JSON.stringify({ phone, code }),
     });
     const j = await r.json();
-
-    if (!j.ok) {
-      setMsg(j.error || "인증 실패");
-      return;
-    }
+    if (!j.ok) return setMsg(j.error || "인증 실패");
 
     try {
       const pc = await fetch("/api/profile-check").then((r) => r.json());
-      if (pc.redirectTo === "/register") {
-        location.href = "/register";
-      } else {
-        location.href = next; // next가 있으면 그쪽, 없으면 /me
-      }
+      location.href = pc.redirectTo === "/register" ? "/register" : next;
     } catch {
       location.href = "/me";
     }
   };
 
   return (
-    <div className="max-w-sm mx-auto p-6 space-y-4">
-      <h1 className="text-xl font-semibold">휴대폰 로그인</h1>
+    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] flex flex-col justify-center items-center px-6">
+      {/* 상단 헤더 */}
+      <div className="text-center mb-10">
+        <div className="text-[40px] font-extrabold text-[#27A36D] leading-none">2025</div>
+        <div className="text-[34px] font-extrabold text-[#27A36D] leading-none mt-1">경기마을주간</div>
+        <div className="text-xl text-[#223D8F] mt-2">10.18(토) – 10.19(일)</div>
+      </div>
 
-      <input
-        className="border w-full p-2 rounded"
-        placeholder="전화번호 (예: 01012345678)"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        disabled={sent}
-      />
+      {/* 아이콘 */}
+      <ClockHouseIcon className="w-28 h-28 text-[#27A36D] mb-6" />
 
-      {!sent ? (
-        <button
-          onClick={request}
-          disabled={isSending || cooldown > 0 || !phone}
-          aria-busy={isSending ? "true" : "false"}
-          className={`w-full p-2 rounded bg-black text-white disabled:opacity-50 ${
-            isSending ? "animate-pulse" : ""
-          }`}
-        >
-          {isSending
-            ? "발송 중…"
-            : cooldown > 0
+      {/* 제목 */}
+      <h1 className="text-3xl font-extrabold mb-2">마을 시간은행</h1>
+      <p className="text-base text-[#223D8F] mb-8">휴대폰 번호로 로그인</p>
+
+      {/* 입력 영역 */}
+      <div className="w-full max-w-xs space-y-3">
+        <input
+          className="w-full p-3 rounded-xl border border-[#A1E1A4] focus:outline-none focus:ring-2 focus:ring-[#2843D1] placeholder-[#7FB68A]"
+          placeholder="휴대폰 번호 (예: 01012345678)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          disabled={sent}
+        />
+
+        {!sent ? (
+          <button
+            onClick={request}
+            disabled={isSending || cooldown > 0 || !phone}
+            className={`w-full p-3 rounded-xl text-white font-semibold bg-[#2843D1] shadow-md transition ${
+              isSending || cooldown > 0 || !phone ? "opacity-60" : "hover:scale-[1.02]"
+            }`}
+          >
+            {isSending
+              ? "발송 중…"
+              : cooldown > 0
               ? `${cooldown}s 후 재전송`
               : "인증번호 발송"}
-        </button>
-      ) : (
-        <>
-          <input
-            className="border w-full p-2 rounded"
-            placeholder="인증코드 6자리"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <button className="w-full p-2 rounded bg-black text-white" onClick={verify}>
-            인증하기
           </button>
-        </>
-      )}
+        ) : (
+          <>
+            <input
+              className="w-full p-3 rounded-xl border border-[#A1E1A4] focus:outline-none focus:ring-2 focus:ring-[#2843D1]"
+              placeholder="인증코드 6자리"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <button
+              onClick={verify}
+              className="w-full p-3 rounded-xl text-white font-semibold bg-[#27A36D] shadow-md hover:scale-[1.02] transition"
+            >
+              인증하기
+            </button>
+          </>
+        )}
 
-      <p className="text-sm text-gray-600">{msg}</p>
-    </div>
+        {msg && <p className="text-sm text-[#2843D1] mt-2 text-center">{msg}</p>}
+      </div>
+
+      {/* 하단 로고 */}
+      <footer className="mt-16 text-sm text-[#1F2C5D] flex flex-col items-center opacity-80">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-6 h-[6px] rounded-sm bg-[#27A36D]" />
+          <span className="inline-block w-6 h-[6px] rounded-sm bg-[#27A36D]" />
+        </div>
+        <span className="mt-2">경기도마을공동체지원센터</span>
+      </footer>
+    </main>
+  );
+}
+
+/** 시계+집 아이콘 (SVG) */
+function ClockHouseIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 128 128" className={className} fill="none">
+      <g fill="currentColor">
+        <circle cx="54" cy="50" r="28" fill="currentColor" opacity="0.18" />
+        <circle cx="54" cy="50" r="24" fill="currentColor" opacity="0.25" />
+        <circle cx="54" cy="50" r="20" fill="#FFF" />
+        <circle cx="54" cy="50" r="18" stroke="currentColor" strokeWidth="2" fill="none"/>
+        <rect x="52.5" y="38" width="3" height="12" rx="1.5" fill="currentColor"/>
+        <rect x="54" y="50" width="10" height="3" rx="1.5" fill="currentColor" transform="rotate(45 54 50)"/>
+        <path d="M74 56l22-16 22 16v34a6 6 0 0 1-6 6H80a6 6 0 0 1-6-6V56z" fill="currentColor" />
+        <rect x="92" y="82" width="8" height="14" rx="1.5" fill="#FFF"/>
+        <rect x="98" y="66" width="8" height="8" fill="#FFF"/>
+      </g>
+    </svg>
   );
 }
