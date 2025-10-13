@@ -1,6 +1,8 @@
 // src/lib/session.js
 import { getIronSession } from "iron-session";
 
+export const runtime = "nodejs";  // ⚠️ 꼭 필요 (iron-session은 edge 미지원)
+
 const COOKIE_NAME =
   process.env.IRON_SESSION_COOKIE_NAME?.trim() || "tb_session"; // 기본값
 const PASSWORD =

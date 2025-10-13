@@ -112,7 +112,7 @@ export default function AdminDashboardPage() {
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] px-6 py-8">
       {/* 헤더 */}
       <div className="max-w-6xl mx-auto flex justify-between items-center flex-wrap gap-3 mb-6">
-        <h1 className="text-2xl font-extrabold tracking-tight">마을 시간은행 운영자 대시보드</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
         <div className="flex flex-wrap gap-2 items-center">
           <span className="px-3 py-1 bg-white rounded-full ring-1 ring-[#27A36D]/40 text-[#1F2C5D] font-semibold text-sm">
             총합: +{totalSum}
@@ -125,7 +125,7 @@ export default function AdminDashboardPage() {
                 : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
             }`}
           >
-            테스트~10/18
+            10/18
           </button>
           <button
             onClick={() => setRange("day2")}
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
                 : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
             }`}
           >
-            10/19~
+            10/19
           </button>
           <div className="w-px h-5 bg-[#CBD5E1]" />
           <button
