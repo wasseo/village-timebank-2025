@@ -297,10 +297,10 @@ const TotalCard = ({ total, earn, redeem }) => (
       </section>
 
       {/* 활동자산 레이더 */}
-      <section className="max-w-3xl mx-auto px-6 mt-6">
+      <section className="max-w-3xl mx-auto px-6 mt-4">
         <div className="rounded-3xl bg-white ring-1 ring-[#A1E1A4]/30 p-5 shadow-sm">
           <div className="font-semibold mb-4">활동자산</div>
-          <div style={{ width: "100%", height: 280 }}>
+          <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer>
               <RadarChart data={radarData}>
                 <PolarGrid />
@@ -314,7 +314,7 @@ const TotalCard = ({ total, earn, redeem }) => (
       </section>
 
       {/* 최근 활동 */}
-      <section id="recent-acts" className="max-w-3xl mx-auto px-6 mt-6 mb-10">
+      <section id="recent-acts" className="max-w-3xl mx-auto px-6 mt-4 mb-10">
         <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-5 shadow-sm">
           <div className="font-semibold mb-2">최근 활동</div>
           {(visibleList.length === 0) ? (

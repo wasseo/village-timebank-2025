@@ -58,7 +58,6 @@ export default function AdminDashboardPage() {
         const j = await fetchMetrics(range);
         setData(j);
       } catch (e) {
-        // 조용히 무시(네트워크 순간 오류 등)
         console.warn("[admin refresh] fetch failed:", e?.message || e);
       }
     }, 60_000); // 1분
@@ -132,58 +131,98 @@ export default function AdminDashboardPage() {
     </ol>
   );
 
- // 총합 카드 (TV/모바일 반응형, 숫자 강조, 칩 색 조정)
-  const TotalCard = ({ total, earnSum, redeemSum }) => (
+  // ----- 칩 컴포넌트 (dot만 glow + 버튼톤 배경) -----
+  const Chip = ({ bg, dot, label, value }) => (
+    <span
+      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
+      style={{ backgroundColor: bg }}
+    >
+      {/* dot + halo */}
+      <span
+        className="relative w-2.5 h-2.5 rounded-full"
+        style={{ backgroundColor: dot, boxShadow: `0 0 6px 2px ${dot}59` /* 35% */ }}
+      />
+      <span className="text-[#1F2C5D] font-medium">{label}</span>
+      <span className="text-[#1F2C5D] font-semibold">+{Number(value || 0)}</span>
+    </span>
+  );
+
+    // 총합 카드 (포스터 색감 반영 버전)
+  const TotalCard = ({ total, earn, redeem }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
-      {/* 모바일=세로 / 데스크톱=가로 */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {/* 좌: 아이콘 + 타이틀 */}
-        <div className="flex items-center gap-3">
-          <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
-            <span className="text-xl text-[#8F8AE6]">●</span>
-          </span>
-          <div className="text-xl md:text-2xl font-bold text-[#223D8F]">마음포인트</div>
+      {/* 상단 타이틀 */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="inline-flex w-7 h-7 rounded-full items-center justify-center bg-[#8F8AE6]/10">
+          <span className="text-sm text-[#8F8AE6]">●</span>
+        </span>
+        <div className="text-base font-semibold text-[#223D8F]">마음포인트</div>
+      </div>
+
+      {/* 숫자 + 칩 한 줄 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* 총합 숫자 */}
+        <div className="text-5xl font-extrabold text-[#1F2C5D] leading-tight">
+          {Number(total || 0)}
         </div>
 
-        {/* 중: 총합 숫자(크고 두껍게) */}
-        <div className="text-5xl md:text-6xl font-black text-[#1F2C5D] leading-none">
-          +{Number(total || 0)}
-        </div>
-
-        {/* 우: 칩 요약 (적립=파랑, 교환=오렌지) */}
-        <div className="flex flex-wrap items-center gap-3">
-          {typeof earnSum === "number" && (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2843D1]/10">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
-              <span className="text-[#1F2C5D] font-medium">적립</span>
-              <span className="text-[#1F2C5D] font-semibold">+{Number(earnSum || 0)}</span>
-            </span>
-          )}
-          {typeof redeemSum === "number" && (
+        {/* 칩 그룹 */}
+        <div className="flex items-center gap-2 text-sm">
+          {/* 적립(파랑) */}
+          <span
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
+            style={{ backgroundColor: "rgba(40,67,209,0.18)" }} // 파랑 배경 18%
+          >
+            {/* dot + halo */}
             <span
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
-              style={{ backgroundColor: "rgb(251 146 60 / 0.15)" }} // #FB923C 15%
-            >
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#EA580C" }} />
-              <span className="text-[#1F2C5D] font-medium">교환</span>
-              <span className="text-[#1F2C5D] font-semibold">+{Number(redeemSum || 0)}</span>
-            </span>
-          )}
+              className="relative w-2.5 h-2.5 rounded-full"
+              style={{
+                backgroundColor: "#2843D1",
+                boxShadow: "0 0 6px 2px rgba(40,67,209,0.35)", // dot halo
+              }}
+            />
+            <span className="text-[#1F2C5D] font-medium">적립</span>
+            <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
+          </span>
+
+          {/* 교환(초록) */}
+          <span
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
+            style={{ backgroundColor: "rgba(39,163,109,0.18)" }} // 초록 배경 18%
+          >
+            {/* dot + halo */}
+            <span
+              className="relative w-2.5 h-2.5 rounded-full"
+              style={{
+                backgroundColor: "#27A36D",
+                boxShadow: "0 0 6px 2px rgba(39,163,109,0.35)",
+              }}
+            />
+            <span className="text-[#1F2C5D] font-medium">교환</span>
+            <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
+          </span>
         </div>
       </div>
     </div>
   );
 
+
   // ---------- 차트 데이터 ----------
-  const series = seriesMode === "hour" ? hourlySeries : timeSeries;
+  // 08~19시만 필터링 (시작/종료 포함)
+  const filteredHourly = useMemo(() => {
+    return (hourlySeries || []).filter(d => {
+      const h = Number(d?.hour);
+      return !Number.isNaN(h) && h >= 8 && h <= 19;
+    });
+  }, [hourlySeries]);
+
+  const series = seriesMode === "hour" ? filteredHourly : timeSeries;
   const xKey    = seriesMode === "hour" ? "hour" : "day";
-  const titleTs = seriesMode === "hour" ? "시간대별(KST)" : "일자별";
+  const hourTicks = useMemo(() => Array.from({ length: 12 }, (_, i) => 8 + i), []); // 8..19
 
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
-      {/* 전체 폭을 TV 해상도에 가깝게 (1920px) */}
       <div className="mx-auto px-8 py-6" style={{ maxWidth: 1920 }}>
-        {/* 헤더 (고정 높이 느낌) */}
+        {/* 헤더 */}
         <div className="flex justify-between items-center flex-wrap gap-3 mb-4">
           <h1 className="text-[36px] font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
           <div className="flex flex-wrap gap-2 items-center">
@@ -231,12 +270,12 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* 총합 카드 (풀폭, 약 140~160px 높이 감) */}
+        {/* 총합 카드 */}
         <section className="mb-4">
-          <TotalCard total={totalSum} earnSum={totalEarnSum} redeemSum={totalRedeemSum} />
+          <TotalCard total={totalSum} earn={totalEarnSum} redeem={totalRedeemSum} />
         </section>
 
-        {/* Top3 5개 (가로 일렬) */}
+        {/* Top3 5개 */}
         <section className="grid grid-cols-5 gap-4 mb-4">
           <Card title={`Top3 총합(개인)`}>
             <RankList items={topUsersOverall} />
@@ -247,7 +286,7 @@ export default function AdminDashboardPage() {
           <Card title={`Top3 교환(개인)`}>
             <RankList items={topUsersRedeem} />
           </Card>
-          <Card title={`Top3 적립(부스)}`}>
+          <Card title={`Top3 적립(부스)`}>
             <RankListBooth items={topBoothsEarn} />
           </Card>
           <Card title={`Top3 교환(부스)`}>
@@ -255,19 +294,32 @@ export default function AdminDashboardPage() {
           </Card>
         </section>
 
-        {/* 하단 2분할: 좌(그래프 2) : 우(레이더 1) */}
+        {/* 하단 2분할 */}
         <section className="grid grid-cols-3 gap-4">
-          {/* 좌측 그래프 (col-span 2) */}
+          {/* 좌측 그래프 */}
           <div className="col-span-2">
-            <Card title={`전체 포인트 그래프`}>  
+            <Card title={`전체 포인트 그래프`}>
               <div style={{ width: "100%", height: 380 }}>
                 <ResponsiveContainer>
                   <LineChart data={series}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
-                    <XAxis dataKey={xKey} stroke="#1F2C5D" />
+                    <XAxis
+                      dataKey={xKey}
+                      stroke="#1F2C5D"
+                      ticks={seriesMode === "hour" ? hourTicks : undefined}
+                      tickFormatter={(v) =>
+                        seriesMode === "hour" ? String(v).padStart(2, "0") + "시" : v
+                      }
+                    />
                     <YAxis stroke="#1F2C5D" allowDecimals={false} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="total" stroke="#2843D1" strokeWidth={3} dot={{ fill: "#27A36D" }} />
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="#2843D1"
+                      strokeWidth={3}
+                      dot={{ fill: "#27A36D" }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -276,7 +328,7 @@ export default function AdminDashboardPage() {
 
           {/* 우측 레이더 */}
           <div className="col-span-1">
-            <Card title={`활동자산 `}>
+            <Card title={`활동자산`}>
               <div style={{ width: "100%", height: 380 }}>
                 <ResponsiveContainer>
                   <RadarChart data={domainTotals}>
