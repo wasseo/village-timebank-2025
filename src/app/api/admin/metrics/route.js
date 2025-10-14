@@ -182,8 +182,8 @@ export async function GET(request) {
       ok: true,
       totalSum,
       totalEarnSum,  //추가
-      totalRedeemSum, 
-      bykind: { earn:totalEarnSum, redeem:totalRedeemsum },  //추가  
+      totalRedeemSum,  // 추가 
+      bykind: { earn:totalEarnSum, redeem:totalRedeemSum },  //추가  
       timeSeries,
       hourlySeries,
       topUsersOverall: topUsersOverallOut,
