@@ -172,10 +172,18 @@ export async function GET(request) {
     }
     const domainTotals = domains.map(d => ({ domain: d, total: domainSums.get(d) }));
 
+    // ── 적립/교환 합계 계산 ─────────────────────────────────────────────────────
+    const totalEarnSum = sum(earnActs, r => r.amount || 0);
+    const totalRedeemSum = sum(redeemActs, r => r.amount || 0);
+
+
     // ── 응답 생성 & 캐시 저장 ───────────────────────────────────────────────────
     const payload = {
       ok: true,
       totalSum,
+      totalEarnSum,  //추가
+      totalRedeemSum, 
+      bykind: { earn:totalEarnSum, redeem:totalRedeemsum },  //추가  
       timeSeries,
       hourlySeries,
       topUsersOverall: topUsersOverallOut,
