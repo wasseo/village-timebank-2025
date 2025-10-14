@@ -14,14 +14,13 @@ export default function AdminDashboardPage() {
   const [range, setRange] = useState("day1");
   const [seriesMode, setSeriesMode] = useState("hour");
 
-  // ---------- fetch ----------
+  // ---- 공용 ----
   const fetchMetrics = async (curRange) => {
     const j = await fetch(`/api/admin/metrics?range=${curRange}`).then(r => r.json());
     if (!j.ok) throw new Error(j.error || "metrics failed");
     return j;
   };
 
-  // ---------- 최초 로드 ----------
   useEffect(() => {
     (async () => {
       try {
@@ -31,16 +30,13 @@ export default function AdminDashboardPage() {
           location.href = `/login?next=${next}`;
           return;
         }
-
         const adminCsv = (process.env.NEXT_PUBLIC_ADMIN_UIDS || "")
           .split(",").map(s => s.trim()).filter(Boolean);
         if (adminCsv.length && !adminCsv.includes(meRes.user.id)) {
-          setErr("접근 권한이 없습니다.");
-          setLoading(false);
-          return;
+          setErr("접근 권한이 없습니다."); setLoading(false); return;
         }
-
         const j = await fetchMetrics(range);
+        console.log("metrics response:", j);
         setData(j);
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
@@ -50,20 +46,14 @@ export default function AdminDashboardPage() {
     })();
   }, [range]);
 
-  // ---------- 1분 갱신 ----------
   useEffect(() => {
     const itv = setInterval(async () => {
-      try {
-        const j = await fetchMetrics(range);
-        setData(j);
-      } catch (e) {
-        console.warn("[admin refresh] fetch failed:", e?.message || e);
-      }
+      try { setData(await fetchMetrics(range)); } catch {}
     }, 60_000);
     return () => clearInterval(itv);
   }, [range]);
 
-  // ---------- 데이터 가공 ----------
+  // ---- 데이터 ----
   const {
     totalSum = 0,
     timeSeries = [],
@@ -79,23 +69,47 @@ export default function AdminDashboardPage() {
     byKind = {},
   } = data || {};
 
-  // 칩 값 폴백 처리
-  const earnVal = (typeof totalEarnSum === "number" ? totalEarnSum : byKind.earn) ?? 0;
+  // 칩 값 폴백
+  const earnVal   = (typeof totalEarnSum   === "number" ? totalEarnSum   : byKind.earn)   ?? 0;
   const redeemVal = (typeof totalRedeemSum === "number" ? totalRedeemSum : byKind.redeem) ?? 0;
 
-  // 08~19시 숫자형 변환
+  // ---- 시간 라벨: 08:00~19:00 고정 ----
+  const HOUR_LABELS = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => String(8 + i).padStart(2, "0") + ":00"),
+    []
+  );
+
+  // 값 키 자동 선택(total/sum/count/value 중 존재하는 것)
+  const pickNumeric = (obj) => {
+    for (const k of ["total", "sum", "count", "value"]) {
+      const v = Number(obj?.[k]);
+      if (!Number.isNaN(v)) return v;
+    }
+    return 0;
+  };
+
+  // "hour" 필드가 어떤 형태로 와도 "HH:00"로 정규화 후, 지정된 라벨만 필터
   const hourlyNormalized = useMemo(() => {
     return (hourlySeries || [])
       .map(d => {
-        const h = Number(d?.hour);
-        return { ...d, hourNum: h };
+        const raw = String(d?.hour ?? "");
+        // 이미 "HH:00"이면 그대로, "8", "08", "08시" 등은 숫자만 뽑아 "HH:00"로 변환
+        const hh = raw.includes(":")
+          ? raw.slice(0, 5) // "08:00"
+          : String(Number(raw.replace(/\D/g, ""))).padStart(2, "0") + ":00";
+        return { ...d, hourStr: hh, value: pickNumeric(d) };
       })
-      .filter(d => !Number.isNaN(d.hourNum) && d.hourNum >= 8 && d.hourNum <= 19);
-  }, [hourlySeries]);
+      .filter(d => HOUR_LABELS.includes(d.hourStr));
+  }, [hourlySeries, HOUR_LABELS]);
 
-  const series = seriesMode === "hour" ? hourlyNormalized : timeSeries;
-  const xKey = seriesMode === "hour" ? "hourNum" : "day";
-  const hourTicks = useMemo(() => Array.from({ length: 12 }, (_, i) => 8 + i), []);
+  // 일자 시리즈도 value 키로 정규화
+  const timeSeriesNormalized = useMemo(
+    () => (timeSeries || []).map(d => ({ ...d, value: pickNumeric(d) })),
+    [timeSeries]
+  );
+
+  const series = seriesMode === "hour" ? hourlyNormalized : timeSeriesNormalized;
+  const xKey   = seriesMode === "hour" ? "hourStr" : "day";
 
   const KR = { environment: "환경", social: "사회", economic: "경제", mental: "정신" };
 
@@ -113,7 +127,7 @@ export default function AdminDashboardPage() {
     return d.length >= 4 ? d.slice(-4) : "-";
   };
 
-  // ---------- UI 컴포넌트 ----------
+  // ---- UI ----
   const Card = ({ title, children }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 shadow-sm h-full">
       <div className="font-semibold mb-2 text-[#1F2C5D]">{title}</div>
@@ -145,51 +159,31 @@ export default function AdminDashboardPage() {
     </ol>
   );
 
-  // --- TotalCard (한 줄 배치 + 색감 반영) ---
+  // 총합 카드 (한 줄 배치 + 색감/칩)
   const TotalCard = ({ total, earn, redeem }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
       <div className="flex items-center justify-between gap-4 flex-nowrap">
-        {/* ● 마음포인트 */}
         <div className="flex items-center gap-2">
           <span className="inline-flex w-7 h-7 rounded-full items-center justify-center bg-[#8F8AE6]/10">
             <span className="text-sm text-[#8F8AE6]">●</span>
           </span>
           <div className="text-base font-semibold text-[#223D8F]">마음포인트</div>
         </div>
-
-        {/* 총합 숫자 */}
         <div className="text-5xl font-extrabold text-[#1F2C5D] leading-tight shrink-0">
           {Number(total || 0)}
         </div>
-
-        {/* 칩 그룹 */}
         <div className="flex items-center gap-2 text-sm shrink-0">
-          <span
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
-            style={{ backgroundColor: "rgba(40,67,209,0.18)" }}
-          >
-            <span
-              className="relative w-2.5 h-2.5 rounded-full"
-              style={{
-                backgroundColor: "#2843D1",
-                boxShadow: "0 0 6px 2px rgba(40,67,209,0.35)",
-              }}
-            />
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
+                style={{ backgroundColor: "rgba(40,67,209,0.18)" }}>
+            <span className="relative w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: "#2843D1", boxShadow: "0 0 6px 2px rgba(40,67,209,0.35)" }} />
             <span className="text-[#1F2C5D] font-medium">적립</span>
             <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
           </span>
-
-          <span
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
-            style={{ backgroundColor: "rgba(39,163,109,0.18)" }}
-          >
-            <span
-              className="relative w-2.5 h-2.5 rounded-full"
-              style={{
-                backgroundColor: "#27A36D",
-                boxShadow: "0 0 6px 2px rgba(39,163,109,0.35)",
-              }}
-            />
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
+                style={{ backgroundColor: "rgba(39,163,109,0.18)" }}>
+            <span className="relative w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: "#27A36D", boxShadow: "0 0 6px 2px rgba(39,163,109,0.35)" }} />
             <span className="text-[#1F2C5D] font-medium">교환</span>
             <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
           </span>
@@ -198,7 +192,7 @@ export default function AdminDashboardPage() {
     </div>
   );
 
-  // ---------- 렌더 ----------
+  // ---- 렌더 ----
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
       {loading ? (
@@ -211,45 +205,29 @@ export default function AdminDashboardPage() {
           <div className="flex justify-between items-center flex-wrap gap-3 mb-4">
             <h1 className="text-[36px] font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
             <div className="flex flex-wrap gap-2 items-center">
-              <button
-                onClick={() => setRange("day1")}
+              <button onClick={() => setRange("day1")}
                 className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
-                  range === "day1"
-                    ? "bg-[#2843D1] text-white ring-[#2843D1]"
-                    : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
-                }`}
-              >
+                  range === "day1" ? "bg-[#2843D1] text-white ring-[#2843D1]"
+                                   : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"}`}>
                 10/18
               </button>
-              <button
-                onClick={() => setRange("day2")}
+              <button onClick={() => setRange("day2")}
                 className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
-                  range === "day2"
-                    ? "bg-[#27A36D] text-white ring-[#27A36D]"
-                    : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
-                }`}
-              >
+                  range === "day2" ? "bg-[#27A36D] text-white ring-[#27A36D]"
+                                   : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"}`}>
                 10/19
               </button>
               <div className="w-px h-6 bg-[#CBD5E1]" />
-              <button
-                onClick={() => setSeriesMode("hour")}
+              <button onClick={() => setSeriesMode("hour")}
                 className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
-                  seriesMode === "hour"
-                    ? "bg-[#2843D1] text-white ring-[#2843D1]"
-                    : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
-                }`}
-              >
+                  seriesMode === "hour" ? "bg-[#2843D1] text-white ring-[#2843D1]"
+                                        : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"}`}>
                 시간대별
               </button>
-              <button
-                onClick={() => setSeriesMode("day")}
+              <button onClick={() => setSeriesMode("day")}
                 className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
-                  seriesMode === "day"
-                    ? "bg-[#27A36D] text-white ring-[#27A36D]"
-                    : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
-                }`}
-              >
+                  seriesMode === "day" ? "bg-[#27A36D] text-white ring-[#27A36D]"
+                                       : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"}`}>
                 일자별
               </button>
             </div>
@@ -283,16 +261,14 @@ export default function AdminDashboardPage() {
                         <XAxis
                           dataKey={xKey}
                           stroke="#1F2C5D"
-                          ticks={seriesMode === "hour" ? hourTicks : undefined}
-                          tickFormatter={(v) =>
-                            seriesMode === "hour" ? String(v).padStart(2, "0") + "시" : v
-                          }
+                          ticks={seriesMode === "hour" ? HOUR_LABELS : undefined}
+                          tickFormatter={(v) => v}
                         />
                         <YAxis stroke="#1F2C5D" allowDecimals={false} />
                         <Tooltip />
                         <Line
                           type="monotone"
-                          dataKey="total"
+                          dataKey="value"  // total/sum/count 중 자동 매핑된 값
                           stroke="#2843D1"
                           strokeWidth={3}
                           dot={{ fill: "#27A36D" }}
