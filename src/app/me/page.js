@@ -17,17 +17,24 @@ export default function MyPage() {
     byCategory: { environment: 0, social: 0, economic: 0, mental: 0 },
   });
 
-  // ✅ 페이징 상태 (append 방식)
+  // 페이징/표시 상태
   const [pageList, setPageList] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [userName, setUserName] = useState("");
 
-  // "처음으로" 복원을 위한 첫 페이지 캐시
+  // "처음으로" 복원용 캐시
   const [firstPage, setFirstPage] = useState({ list: [], nextCursor: null, hasMore: true });
 
-  const INITIAL_LIMIT = 10;
+  // 표시 개수 제어: 최초 3개, 이후 10개씩 증가
+  const INITIAL_VISIBLE = 3;
+  const STEP = 10;
+  const INITIAL_LIMIT = 10; // 서버 최초 로드도 10개 받아 두고 3개만 보여줌
+
+  // 실제로 화면에 보일 리스트
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const visibleList = useMemo(() => pageList.slice(0, visibleCount), [pageList, visibleCount]);
 
   useEffect(() => {
     (async () => {
@@ -61,16 +68,20 @@ export default function MyPage() {
           },
         });
 
-        setPageList(Array.isArray(acts.list) ? acts.list : []);
+        const list = Array.isArray(acts.list) ? acts.list : [];
+        setPageList(list);
         setNextCursor(acts.nextCursor || null);
         setHasMore(!!acts.hasMore);
 
-        // 처음 페이지 캐시 (처음으로 버튼에서 사용)
+        // 캐시
         setFirstPage({
-          list: Array.isArray(acts.list) ? acts.list : [],
+          list,
           nextCursor: acts.nextCursor || null,
           hasMore: !!acts.hasMore,
         });
+
+        // 최초 표시 개수(3개)로 고정
+        setVisibleCount(INITIAL_VISIBLE);
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
       } finally {
@@ -129,10 +140,11 @@ export default function MyPage() {
     );
   };
 
-  // ✅ 기존 칩 디자인 유지한 총합 카드
+  // 총합 카드 (칩: 이전 색감 + halo)
   const TotalCard = ({ total, earn, redeem }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* 좌측: 타이틀 */}
         <div className="flex items-center gap-3">
           <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
             <span className="text-xl text-[#8F8AE6]">●</span>
@@ -140,20 +152,49 @@ export default function MyPage() {
           <div className="text-xl md:text-2xl font-bold text-[#223D8F]">마음포인트</div>
         </div>
 
+        {/* 중앙: 총합 */}
         <div className="text-5xl md:text-6xl font-black text-[#1F2C5D] leading-none">
           {Number(total || 0)}
         </div>
 
-        {/* ← 이 칩 UI 그대로 유지 */}
+        {/* 칩 UI */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2843D1]/10">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
+          {/* 적립(이전 네이비 + halo) */}
+          <span
+            className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{ backgroundColor: "rgba(34, 61, 143, 0.10)" }} // #223D8F 10%
+          >
+            {/* halo */}
+            <span
+              className="absolute left-2 w-5 h-5 rounded-full opacity-30 blur-md"
+              style={{ backgroundColor: "#223D8F" }}
+              aria-hidden
+            />
+            {/* core dot */}
+            <span
+              className="relative w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: "#223D8F" }}
+            />
             <span className="text-[#1F2C5D] font-medium">적립</span>
             <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
           </span>
 
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgb(251 146 60 / 0.15)" }}>
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#EA580C" }} />
+          {/* 교환(이전 오렌지 + halo) */}
+          <span
+            className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{ backgroundColor: "rgba(249, 115, 22, 0.15)" }} // #F97316 15%
+          >
+            {/* halo */}
+            <span
+              className="absolute left-2 w-5 h-5 rounded-full opacity-30 blur-md"
+              style={{ backgroundColor: "#F97316" }}
+              aria-hidden
+            />
+            {/* core dot */}
+            <span
+              className="relative w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: "#F97316" }}
+            />
             <span className="text-[#1F2C5D] font-medium">교환</span>
             <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
           </span>
@@ -161,6 +202,7 @@ export default function MyPage() {
       </div>
     </div>
   );
+  
 
   // 최근활동 아이템
   const ActivityItem = ({ a }) => {
@@ -184,8 +226,15 @@ export default function MyPage() {
     );
   };
 
-  // 더보기(append)
-  const fetchMore = async () => {
+  // 더 보기: 10개씩
+  const showMore = async () => {
+    // 로컬에 남아 있는 항목으로도 10개 확장 가능하면 fetch 없이 처리
+    if (pageList.length >= visibleCount + STEP) {
+      setVisibleCount(c => c + STEP);
+      return;
+    }
+
+    // 더 받아와야 하는 경우
     if (!hasMore || loadingMore) return;
     setLoadingMore(true);
     try {
@@ -196,9 +245,16 @@ export default function MyPage() {
       const res = await fetch(url).then(r => r.json());
       if (!res?.ok) throw new Error(res?.error || "더보기에 실패했습니다.");
 
-      setPageList(prev => [...prev, ...(res.list || [])]);
+      // 새로 받은 것 append
+      setPageList(prev => {
+        const appended = [...prev, ...(res.list || [])];
+        return appended;
+      });
       setNextCursor(res.nextCursor || null);
       setHasMore(!!res.hasMore);
+
+      // 총 보이는 개수 10개 늘리기 (받아온 게 부족해도 최대치로)
+      setVisibleCount(c => Math.min(c + STEP, (res.list?.length ?? 0) + pageList.length));
     } catch (e) {
       setErr(e.message || "오류가 발생했습니다.");
     } finally {
@@ -206,16 +262,20 @@ export default function MyPage() {
     }
   };
 
-  // 처음으로 (캐시 복원 + 스크롤 상단)
+  // 처음으로: 캐시 복원 + 표시 개수 3개로 리셋
   const backToTop = () => {
     setPageList(firstPage.list || []);
     setNextCursor(firstPage.nextCursor || null);
     setHasMore(!!firstPage.hasMore);
+    setVisibleCount(INITIAL_VISIBLE);
 
     const el = document.getElementById("recent-acts");
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     else window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // 버튼 노출 조건
+  const allVisible = visibleCount >= pageList.length && !hasMore;
 
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
@@ -258,16 +318,16 @@ export default function MyPage() {
         </div>
       </section>
 
-      {/* 최근 활동 (서버 페이징 + 더보기/처음으로) */}
+      {/* 최근 활동 */}
       <section id="recent-acts" className="max-w-3xl mx-auto px-6 mt-6 mb-10">
         <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-5 shadow-sm">
           <div className="font-semibold mb-2">최근 활동</div>
-          {(pageList.length === 0) ? (
+          {(visibleList.length === 0) ? (
             <div className="text-[#94A3B8] text-sm">활동이 아직 없습니다.</div>
           ) : (
             <>
               <ul className="divide-y divide-[#E2E8F0]">
-                {pageList.map((a) => (
+                {visibleList.map((a) => (
                   <ActivityItem
                     key={a.id ?? `${a.booth_id ?? 'booth'}-${a.created_at}`}
                     a={a}
@@ -276,14 +336,14 @@ export default function MyPage() {
               </ul>
 
               <div className="mt-4 flex justify-center">
-                {hasMore ? (
+                {!allVisible ? (
                   <button
                     type="button"
-                    onClick={fetchMore}
+                    onClick={showMore}
                     disabled={loadingMore}
                     className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] font-semibold hover:bg-[#2843D1]/5"
                   >
-                    {loadingMore ? "불러오는 중…" : "더 보기"}
+                    {loadingMore ? "불러오는 중…" : "더 보기 (10개)"}
                   </button>
                 ) : (
                   <button
