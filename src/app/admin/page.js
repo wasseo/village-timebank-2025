@@ -132,35 +132,48 @@ export default function AdminDashboardPage() {
     </ol>
   );
 
-  // 총합 카드 (풀폭, TV 가독성 크게)
+ // 총합 카드 (TV/모바일 반응형, 숫자 강조, 칩 색 조정)
   const TotalCard = ({ total, earnSum, redeemSum }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+      {/* 모바일=세로 / 데스크톱=가로 */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* 좌: 아이콘 + 타이틀 */}
         <div className="flex items-center gap-3">
           <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
             <span className="text-xl text-[#8F8AE6]">●</span>
           </span>
-          <div className="text-2xl font-bold text-[#223D8F]"> 마음 포인트</div>
+          <div className="text-xl md:text-2xl font-bold text-[#223D8F]">마음포인트</div>
         </div>
-        <div className="text-[40px] md:text-[56px] font-extrabold text-[#1F2C5D] leading-none">+{Number(total || 0)}</div>
-      </div>
-      
-      {(typeof earnSum === "number" || typeof redeemSum === "number") && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+
+        {/* 중: 총합 숫자(크고 두껍게) */}
+        <div className="text-5xl md:text-6xl font-black text-[#1F2C5D] leading-none">
+          +{Number(total || 0)}
+        </div>
+
+        {/* 우: 칩 요약 (적립=파랑, 교환=오렌지) */}
+        <div className="flex flex-wrap items-center gap-3">
           {typeof earnSum === "number" && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#27A36D]/10 text-[#1F2C5D]">
-              <span className="w-2 h-2 rounded-full bg-[#27A36D]" />
-              적립 +{Number(earnSum || 0)}
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2843D1]/10">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
+              <span className="text-[#1F2C5D] font-medium">적립</span>
+              <span className="text-[#1F2C5D] font-semibold">+{Number(earnSum || 0)}</span>
             </span>
           )}
           {typeof redeemSum === "number" && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#2843D1]/10 text-[#1F2C5D]">
-              <span className="w-2 h-2 rounded-full bg-[#2843D1]" />
-              교환 +{Number(redeemSum || 0)}
+            <span
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
+              style={{ backgroundColor: "rgb(251 146 60 / 0.15)" }} // #FB923C 15%
+            >
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#EA580C" }} />
+              <span className="text-[#1F2C5D] font-medium">교환</span>
+              <span className="text-[#1F2C5D] font-semibold">+{Number(redeemSum || 0)}</span>
             </span>
           )}
         </div>
-      )}
+      </div>
+
+      {/* 보조 라벨 */}
+      <div className="text-xs text-[#64748B] mt-2">(적립 + 교환)</div>
     </div>
   );
 
@@ -228,19 +241,19 @@ export default function AdminDashboardPage() {
 
         {/* Top3 5개 (가로 일렬) */}
         <section className="grid grid-cols-5 gap-4 mb-4">
-          <Card title={`Top3 총합(개인) · ${rangeLabel}`}>
+          <Card title={`Top3 총합(개인)`}>
             <RankList items={topUsersOverall} />
           </Card>
-          <Card title={`Top3 적립(개인) · ${rangeLabel}`}>
+          <Card title={`Top3 적립(개인)`}>
             <RankList items={topUsersEarn} />
           </Card>
-          <Card title={`Top3 교환(개인) · ${rangeLabel}`}>
+          <Card title={`Top3 교환(개인)`}>
             <RankList items={topUsersRedeem} />
           </Card>
-          <Card title={`Top3 적립(부스) · ${rangeLabel}`}>
+          <Card title={`Top3 적립(부스)}`}>
             <RankListBooth items={topBoothsEarn} />
           </Card>
-          <Card title={`Top3 교환(부스) · ${rangeLabel}`}>
+          <Card title={`Top3 교환(부스)`}>
             <RankListBooth items={topBoothsRedeem} />
           </Card>
         </section>
@@ -249,8 +262,8 @@ export default function AdminDashboardPage() {
         <section className="grid grid-cols-3 gap-4">
           {/* 좌측 그래프 (col-span 2) */}
           <div className="col-span-2">
-            <Card title={`전체 포인트 그래프 · ${titleTs} · ${rangeLabel}`}>
-              <div style={{ width: "100%", height: 420 }}>
+            <Card title={`전체 포인트 그래프`}>  
+              <div style={{ width: "100%", height: 380 }}>
                 <ResponsiveContainer>
                   <LineChart data={series}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
@@ -266,7 +279,7 @@ export default function AdminDashboardPage() {
 
           {/* 우측 레이더 */}
           <div className="col-span-1">
-            <Card title={`활동자산 · ${rangeLabel}`}>
+            <Card title={`활동자산 `}>
               <div style={{ width: "100%", height: 380 }}>
                 <ResponsiveContainer>
                   <RadarChart data={domainTotals}>
