@@ -169,7 +169,7 @@ export default function MyPage() {
       <section className="max-w-3xl mx-auto px-6 mt-3">
         <div className="rounded-3xl bg-white ring-1 ring-[#A1E1A4]/30 p-3 shadow-sm">
           <div className="font-semibold mb-2">활동자산</div>
-          <div style={{ width: "100%", height: 160 }}>
+          <div style={{ width: "100%", height: 200 }}>
             <ResponsiveContainer>
               <RadarChart data={radarData}>
                 <PolarGrid />
