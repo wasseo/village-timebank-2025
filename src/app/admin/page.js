@@ -140,12 +140,11 @@ export default function AdminDashboardPage() {
           <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
             <span className="text-xl text-[#8F8AE6]">●</span>
           </span>
-          <div className="text-2xl font-bold text-[#223D8F]">총 마음 포인트</div>
+          <div className="text-2xl font-bold text-[#223D8F]"> 마음 포인트</div>
         </div>
         <div className="text-[40px] md:text-[56px] font-extrabold text-[#1F2C5D] leading-none">+{Number(total || 0)}</div>
       </div>
-      <div className="text-sm text-[#64748B] mt-2">(적립 + 교환)</div>
-
+      
       {(typeof earnSum === "number" || typeof redeemSum === "number") && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           {typeof earnSum === "number" && (
@@ -178,9 +177,6 @@ export default function AdminDashboardPage() {
         <div className="flex justify-between items-center flex-wrap gap-3 mb-4">
           <h1 className="text-[36px] font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="px-3 py-1 bg-white rounded-full ring-1 ring-[#27A36D]/40 text-[#1F2C5D] font-semibold text-base">
-              총합: +{totalSum}
-            </span>
             <button
               onClick={() => setRange("day1")}
               className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
@@ -280,9 +276,6 @@ export default function AdminDashboardPage() {
                     <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.4} />
                   </RadarChart>
                 </ResponsiveContainer>
-              </div>
-              <div className="flex justify-end mt-3">
-                <span className="text-sm text-[#1F2C5D]/70">경기도마을공동체지원센터</span>
               </div>
             </Card>
           </div>
