@@ -1,7 +1,7 @@
 // src/app/admin/page.js
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
@@ -11,9 +11,17 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [range, setRange] = useState("day1");
-  const [seriesMode, setSeriesMode] = useState("hour");
+  const [range, setRange] = useState("day1");          // 10/18, 10/19
+  const [seriesMode, setSeriesMode] = useState("hour"); // "hour" | "day"
 
+  // ---------- 공용 fetch 함수 ----------
+  const fetchMetrics = async (curRange) => {
+    const j = await fetch(`/api/admin/metrics?range=${curRange}`).then(r => r.json());
+    if (!j.ok) throw new Error(j.error || "metrics failed");
+    return j;
+  };
+
+  // ---------- 최초 로드 + range 변경 시 로드 ----------
   useEffect(() => {
     (async () => {
       try {
@@ -24,6 +32,7 @@ export default function AdminDashboardPage() {
           return;
         }
 
+        // 관리자 화이트리스트 체크
         const adminCsv = (process.env.NEXT_PUBLIC_ADMIN_UIDS || "")
           .split(",").map(s => s.trim()).filter(Boolean);
         if (adminCsv.length && !adminCsv.includes(meRes.user.id)) {
@@ -32,8 +41,7 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        const j = await fetch(`/api/admin/metrics?range=${range}`).then(r => r.json());
-        if (!j.ok) throw new Error(j.error || "metrics failed");
+        const j = await fetchMetrics(range);
         setData(j);
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
@@ -41,6 +49,20 @@ export default function AdminDashboardPage() {
         setLoading(false);
       }
     })();
+  }, [range]);
+
+  // ---------- 1분 자동 갱신 (자동 순환 없음) ----------
+  useEffect(() => {
+    const itv = setInterval(async () => {
+      try {
+        const j = await fetchMetrics(range);
+        setData(j);
+      } catch (e) {
+        // 조용히 무시(네트워크 순간 오류 등)
+        console.warn("[admin refresh] fetch failed:", e?.message || e);
+      }
+    }, 60_000); // 1분
+    return () => clearInterval(itv);
   }, [range]);
 
   if (loading) return <main className="min-h-screen bg-[#FFF7E3] p-6">불러오는 중…</main>;
@@ -56,9 +78,13 @@ export default function AdminDashboardPage() {
     topBoothsEarn = [],
     topBoothsRedeem = [],
     domainTotals = [],
+    // (있을 수 있는 필드 – 있으면 총합 카드에 칩으로 노출)
+    totalEarnSum,
+    totalRedeemSum,
   } = data || {};
 
   const KR = { environment: "환경", social: "사회", economic: "경제", mental: "정신" };
+  const rangeLabel = range === "day1" ? "10/18" : "10/19";
 
   const maskName = (raw) => {
     if (!raw) return "익명";
@@ -76,7 +102,7 @@ export default function AdminDashboardPage() {
   const rankLabel = (x) => `${maskName(x.name)} / ${last4(x.phone)}`;
 
   const Card = ({ title, children }) => (
-    <div className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 shadow-sm">
+    <div className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 shadow-sm h-full">
       <div className="font-semibold mb-2 text-[#1F2C5D]">{title}</div>
       {children}
     </div>
@@ -106,115 +132,162 @@ export default function AdminDashboardPage() {
     </ol>
   );
 
-  const rangeLabel = range === "day1" ? "10/18" : "10/19";
+  // 총합 카드 (풀폭, TV 가독성 크게)
+  const TotalCard = ({ total, earnSum, redeemSum }) => (
+    <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
+            <span className="text-xl text-[#8F8AE6]">●</span>
+          </span>
+          <div className="text-2xl font-bold text-[#223D8F]">총 마음 포인트</div>
+        </div>
+        <div className="text-[40px] md:text-[56px] font-extrabold text-[#1F2C5D] leading-none">+{Number(total || 0)}</div>
+      </div>
+      <div className="text-sm text-[#64748B] mt-2">(적립 + 교환)</div>
+
+      {(typeof earnSum === "number" || typeof redeemSum === "number") && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          {typeof earnSum === "number" && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#27A36D]/10 text-[#1F2C5D]">
+              <span className="w-2 h-2 rounded-full bg-[#27A36D]" />
+              적립 +{Number(earnSum || 0)}
+            </span>
+          )}
+          {typeof redeemSum === "number" && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#2843D1]/10 text-[#1F2C5D]">
+              <span className="w-2 h-2 rounded-full bg-[#2843D1]" />
+              교환 +{Number(redeemSum || 0)}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // ---------- 차트 데이터 ----------
+  const series = seriesMode === "hour" ? hourlySeries : timeSeries;
+  const xKey    = seriesMode === "hour" ? "hour" : "day";
+  const titleTs = seriesMode === "hour" ? "시간대별(KST)" : "일자별";
 
   return (
-    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] px-6 py-8">
-      {/* 헤더 */}
-      <div className="max-w-6xl mx-auto flex justify-between items-center flex-wrap gap-3 mb-6">
-        <h1 className="text-2xl font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="px-3 py-1 bg-white rounded-full ring-1 ring-[#27A36D]/40 text-[#1F2C5D] font-semibold text-sm">
-            총합: +{totalSum}
-          </span>
-          <button
-            onClick={() => setRange("day1")}
-            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
-              range === "day1"
-                ? "bg-[#2843D1] text-white ring-[#2843D1]"
-                : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
-            }`}
-          >
-            10/18
-          </button>
-          <button
-            onClick={() => setRange("day2")}
-            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
-              range === "day2"
-                ? "bg-[#27A36D] text-white ring-[#27A36D]"
-                : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
-            }`}
-          >
-            10/19
-          </button>
-          <div className="w-px h-5 bg-[#CBD5E1]" />
-          <button
-            onClick={() => setSeriesMode("hour")}
-            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
-              seriesMode === "hour"
-                ? "bg-[#2843D1] text-white ring-[#2843D1]"
-                : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
-            }`}
-          >
-            시간대별
-          </button>
-          <button
-            onClick={() => setSeriesMode("day")}
-            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
-              seriesMode === "day"
-                ? "bg-[#27A36D] text-white ring-[#27A36D]"
-                : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
-            }`}
-          >
-            일자별
-          </button>
+    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
+      {/* 전체 폭을 TV 해상도에 가깝게 (1920px) */}
+      <div className="mx-auto px-8 py-6" style={{ maxWidth: 1920 }}>
+        {/* 헤더 (고정 높이 느낌) */}
+        <div className="flex justify-between items-center flex-wrap gap-3 mb-4">
+          <h1 className="text-[36px] font-extrabold tracking-tight">2025 경기마을주간행사 마음자산</h1>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="px-3 py-1 bg-white rounded-full ring-1 ring-[#27A36D]/40 text-[#1F2C5D] font-semibold text-base">
+              총합: +{totalSum}
+            </span>
+            <button
+              onClick={() => setRange("day1")}
+              className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
+                range === "day1"
+                  ? "bg-[#2843D1] text-white ring-[#2843D1]"
+                  : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
+              }`}
+            >
+              10/18
+            </button>
+            <button
+              onClick={() => setRange("day2")}
+              className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
+                range === "day2"
+                  ? "bg-[#27A36D] text-white ring-[#27A36D]"
+                  : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
+              }`}
+            >
+              10/19
+            </button>
+            <div className="w-px h-6 bg-[#CBD5E1]" />
+            <button
+              onClick={() => setSeriesMode("hour")}
+              className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
+                seriesMode === "hour"
+                  ? "bg-[#2843D1] text-white ring-[#2843D1]"
+                  : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"
+              }`}
+            >
+              시간대별
+            </button>
+            <button
+              onClick={() => setSeriesMode("day")}
+              className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
+                seriesMode === "day"
+                  ? "bg-[#27A36D] text-white ring-[#27A36D]"
+                  : "text-[#27A36D] ring-[#27A36D]/50 hover:bg-[#27A36D]/10"
+              }`}
+            >
+              일자별
+            </button>
+          </div>
         </div>
+
+        {/* 총합 카드 (풀폭, 약 140~160px 높이 감) */}
+        <section className="mb-4">
+          <TotalCard total={totalSum} earnSum={totalEarnSum} redeemSum={totalRedeemSum} />
+        </section>
+
+        {/* Top3 5개 (가로 일렬) */}
+        <section className="grid grid-cols-5 gap-4 mb-4">
+          <Card title={`Top3 총합(개인) · ${rangeLabel}`}>
+            <RankList items={topUsersOverall} />
+          </Card>
+          <Card title={`Top3 적립(개인) · ${rangeLabel}`}>
+            <RankList items={topUsersEarn} />
+          </Card>
+          <Card title={`Top3 교환(개인) · ${rangeLabel}`}>
+            <RankList items={topUsersRedeem} />
+          </Card>
+          <Card title={`Top3 적립(부스) · ${rangeLabel}`}>
+            <RankListBooth items={topBoothsEarn} />
+          </Card>
+          <Card title={`Top3 교환(부스) · ${rangeLabel}`}>
+            <RankListBooth items={topBoothsRedeem} />
+          </Card>
+        </section>
+
+        {/* 하단 2분할: 좌(그래프 2) : 우(레이더 1) */}
+        <section className="grid grid-cols-3 gap-4">
+          {/* 좌측 그래프 (col-span 2) */}
+          <div className="col-span-2">
+            <Card title={`전체 포인트 그래프 · ${titleTs} · ${rangeLabel}`}>
+              <div style={{ width: "100%", height: 420 }}>
+                <ResponsiveContainer>
+                  <LineChart data={series}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
+                    <XAxis dataKey={xKey} stroke="#1F2C5D" />
+                    <YAxis stroke="#1F2C5D" allowDecimals={false} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="total" stroke="#2843D1" strokeWidth={3} dot={{ fill: "#27A36D" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </div>
+
+          {/* 우측 레이더 */}
+          <div className="col-span-1">
+            <Card title={`활동자산 · ${rangeLabel}`}>
+              <div style={{ width: "100%", height: 380 }}>
+                <ResponsiveContainer>
+                  <RadarChart data={domainTotals}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
+                    <PolarRadiusAxis />
+                    <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.4} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-end mt-3">
+                <span className="text-sm text-[#1F2C5D]/70">경기도마을공동체지원센터</span>
+              </div>
+            </Card>
+          </div>
+        </section>
       </div>
-
-      {/* 라인차트 */}
-      <section className="max-w-6xl mx-auto mb-6">
-        <Card title={`전체 활동 포인트 · ${seriesMode==="hour" ? "시간대별(KST)" : "일자별"} · ${rangeLabel}`}>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer>
-              <LineChart data={seriesMode==="hour" ? hourlySeries : timeSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
-                <XAxis dataKey={seriesMode==="hour" ? "hour" : "day"} stroke="#1F2C5D" />
-                <YAxis stroke="#1F2C5D" allowDecimals={false} />
-                <Tooltip />
-                <Line type="monotone" dataKey="total" stroke="#2843D1" strokeWidth={3} dot={{ fill: "#27A36D" }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </section>
-
-      {/* Top3 영역 */}
-      <section className="max-w-6xl mx-auto grid md:grid-cols-2 gap-4">
-        <Card title={`총 활동이 많은 사람 Top3 · ${rangeLabel}`}>
-          <RankList items={topUsersOverall} />
-        </Card>
-        <Card title={`적립(Earn)이 많은 사람 Top3 · ${rangeLabel}`}>
-          <RankList items={topUsersEarn} />
-        </Card>
-        <Card title={`교환(Redeem)이 많은 사람 Top3 · ${rangeLabel}`}>
-          <RankList items={topUsersRedeem} />
-        </Card>
-        <Card title={`적립이 많은 부스 Top3 · ${rangeLabel}`}>
-          <RankListBooth items={topBoothsEarn} />
-        </Card>
-        <Card title={`교환이 많은 부스 Top3 · ${rangeLabel}`}>
-          <RankListBooth items={topBoothsRedeem} />
-        </Card>
-      </section>
-
-      {/* 방사형 차트 */}
-      <section className="max-w-6xl mx-auto mt-6 mb-10">
-        <Card title={`2025경기마을공동체 활동자산 · ${rangeLabel}`}>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
-              <RadarChart data={domainTotals}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
-                <PolarRadiusAxis />
-                <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.4} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-end mt-3">
-            <span className="text-sm text-[#1F2C5D]/70">경기도마을공동체지원센터</span>
-          </div>
-        </Card>
-      </section>
     </main>
   );
 }
