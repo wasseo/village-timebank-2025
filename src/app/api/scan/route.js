@@ -13,8 +13,14 @@ const admin = createClient(
   { auth: { persistSession: false } }
 );
 
-const RECENT_DUP_SECONDS = 20;
+const RECENT_DUP_SECONDS = 60; // 동일 부스 최근 중복 방지 시간 60(초)
 const isDev = process.env.NODE_ENV !== "production";
+
+// 🔧 kind별 쿨다운 (분)
+const COOLDOWN_MINUTES = {
+  earn: 50,
+  redeem: 10,
+};
 
 /** URL/문자열 정규화: 어떤 형태로 와도 booth_id/code를 최대한 뽑아낸다 */
 function normalizeScanInput({ booth_id_param, code_param }) {
@@ -118,7 +124,37 @@ export async function POST(req) {
     const amount = Number(boothRow.amount || 0);
     const kind   = boothRow.kind === "redeem" ? "redeem" : "earn";
 
-    // 2) 최근 중복 방지 (동일 부스에 연속 스캔)
+    // 🔒 (A) kind 전역 쿨다운 검증: 최근 동일 kind 활동과의 시간 차이
+    //  - earn: 50분 / redeem: 10분
+    const cooldownMin = COOLDOWN_MINUTES[kind] ?? 0;
+    if (cooldownMin > 0) {
+      const { data: lastKind, error: lastKindErr } = await admin
+        .from("activities")
+        .select("created_at")
+        .eq("user_id", session.user.id)
+        .eq("kind", kind)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastKindErr) throw lastKindErr;
+
+      if (lastKind?.created_at) {
+        const diffMin = (Date.now() - new Date(lastKind.created_at).getTime()) / 60000;
+        if (diffMin < cooldownMin) {
+          const remain = Math.max(1, Math.ceil(cooldownMin - diffMin));
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `${kind === "earn" ? "적립" : "교환"}은 ${cooldownMin}분 간격으로 이용 가능합니다. 약 ${remain}분 후에 다시 시도해 주세요.`,
+              meta: isDev ? { last: lastKind.created_at, diffMin, cooldownMin } : undefined,
+            },
+            { status: 429, headers: res.headers }
+          );
+        }
+      }
+    }
+
+    // 2) 최근 중복 방지 (동일 부스에 연속 스캔, 20초)
     const sinceIso = new Date(Date.now() - RECENT_DUP_SECONDS * 1000).toISOString();
     const { data: recentDup, error: dupErr } = await admin
       .from("activities")
