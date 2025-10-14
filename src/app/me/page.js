@@ -140,62 +140,43 @@ export default function MyPage() {
     );
   };
 
-  // 총합 카드 (칩: 이전 색감 + halo)
-  // 총합 카드 (버튼톤 칩 + dot만 halo)
-  const TotalCard = ({ total, earn, redeem }) => (
-    <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
-      {/* 타이틀 */}
+ // 총합 카드 (모바일/데스크톱 반응형 레이아웃 + 숫자 강조 + 칩 색상 조정)
+const TotalCard = ({ total, earn, redeem }) => (
+  <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-5 shadow-sm">
+    {/* 레이아웃: 모바일 세로, 데스크톱 가로 */}
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* 좌측: 아이콘 + 타이틀 */}
       <div className="flex items-center gap-3">
-        <span className="inline-flex w-9 h-9 rounded-full items-center justify-center bg-[#8F8AE6]/10">
-          <span className="text-lg text-[#8F8AE6]">●</span>
+        <span className="inline-flex w-10 h-10 rounded-full items-center justify-center bg-[#8F8AE6]/10">
+          <span className="text-xl text-[#8F8AE6]">●</span>
         </span>
-        <div className="text-lg font-semibold text-[#223D8F]">총 마음포인트</div>
+        <div className="text-xl md:text-2xl font-bold text-[#223D8F]">마음포인트</div>
       </div>
 
-      {/* 총합 */}
-      <div className="mt-2 text-4xl font-extrabold text-[#1F2C5D]">
+      {/* 중앙: 총합 숫자(크고 두껍게) */}
+      <div className="text-5xl md:text-6xl font-black text-[#1F2C5D] leading-none">
         {Number(total || 0)}
       </div>
-      <div className="text-xs text-[#64748B] mt-1">(적립 + 교환)</div>
 
-      {/* 칩 UI (버튼톤 + dot만 halo) */} 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-        {/* 적립(파랑) */}
-        <span
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
-          style={{ backgroundColor: "rgba(40,67,209,0.18)" }} // #2843D1 18%
-        >
-          {/* dot + halo */}
-          <span
-            className="relative w-2.5 h-2.5 rounded-full"
-            style={{
-              backgroundColor: "#2843D1",
-              boxShadow: "0 0 6px 2px rgba(40,67,209,0.35)",
-            }}
-          />
+       {/* 우측: 칩 요약 (적립=초록, 교환=파랑) */}
+      <div className="flex flex-wrap items-center gap-3">
+       {/* 적립 칩 */}
+        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#27A36D]/10">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#27A36D" }} />
           <span className="text-[#1F2C5D] font-medium">적립</span>
           <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
         </span>
 
-        {/* 교환(초록) */}
-        <span
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm"
-          style={{ backgroundColor: "rgba(39,163,109,0.18)" }} // #27A36D 18%
-        >
-          {/* dot + halo */}
-          <span
-            className="relative w-2.5 h-2.5 rounded-full"
-            style={{
-              backgroundColor: "#27A36D",
-              boxShadow: "0 0 6px 2px rgba(39,163,109,0.35)",
-           }}
-          />
+        {/* 교환 칩 */}
+        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#2843D1]/10">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
           <span className="text-[#1F2C5D] font-medium">교환</span>
           <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
         </span>
       </div>
     </div>
-  );
+  </div>
+);
 
 
   // 최근활동 아이템
