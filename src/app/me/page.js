@@ -18,9 +18,9 @@ export default function MyPage() {
   const [list, setList] = useState([]);
   const [userName, setUserName] = useState("");
 
-  // (3) 최근활동 더보기 토글 상태
+  // 최근활동 더보기 토글
   const [showAll, setShowAll] = useState(false);
-  const VISIBLE_COUNT = 6;
+  const VISIBLE_COUNT = 3;
 
   useEffect(() => {
     (async () => {
@@ -32,16 +32,31 @@ export default function MyPage() {
           location.href = `/login?next=${next}`;
           return;
         }
-        // 이름(있으면) 표시용
-        const metaName = me?.user?.user_metadata?.name || me?.profile?.name || "";
-        setUserName(metaName);
+        setUserName(me?.user?.user_metadata?.name || me?.profile?.name || "");
 
         // 활동 요약 + 최근 활동
         const acts = await fetch("/api/activities").then(r => r.json());
         if (!acts?.ok) throw new Error(acts?.error || "활동을 불러오지 못했습니다.");
 
-        setSummary(acts.summary || {});
-        setList(Array.isArray(acts.list) ? acts.list : []);
+        // 최신순 정렬 보장
+        const sorted = Array.isArray(acts.list)
+          ? [...acts.list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          : [];
+
+        setSummary({
+          total: acts?.summary?.total ?? 0,
+          byKind: {
+            earn: acts?.summary?.byKind?.earn ?? 0,
+            redeem: acts?.summary?.byKind?.redeem ?? 0,
+          },
+          byCategory: {
+            environment: acts?.summary?.byCategory?.environment ?? 0,
+            social: acts?.summary?.byCategory?.social ?? 0,
+            economic: acts?.summary?.byCategory?.economic ?? 0,
+            mental: acts?.summary?.byCategory?.mental ?? 0,
+          },
+        });
+        setList(sorted);
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
       } finally {
@@ -78,11 +93,12 @@ export default function MyPage() {
 
   const fmtPlus = (n) => `+${Number(n || 0)}`;
 
+  // (옵션) 유지: 필요 시 다른 곳에서 재사용 가능
   const StatCard = ({ title, value, tone = "blue", sub }) => {
     const tones = {
-      blue: { ring: "ring-[#2843D1]/30", iconBg: "bg-[#2843D1]/10", icon: "text-[#2843D1]" },
-      green:{ ring: "ring-[#27A36D]/30", iconBg: "bg-[#27A36D]/10", icon: "text-[#27A36D]" },
-      lilac:{ ring: "ring-[#8F8AE6]/30", iconBg: "bg-[#8F8AE6]/10", icon: "text-[#8F8AE6]" },
+      blue:  { ring: "ring-[#2843D1]/30", iconBg: "bg-[#2843D1]/10", icon: "text-[#2843D1]" },
+      green: { ring: "ring-[#27A36D]/30", iconBg: "bg-[#27A36D]/10", icon: "text-[#27A36D]" },
+      lilac: { ring: "ring-[#8F8AE6]/30", iconBg: "bg-[#8F8AE6]/10", icon: "text-[#8F8AE6]" },
     }[tone];
 
     return (
@@ -91,26 +107,48 @@ export default function MyPage() {
           <span className={`inline-flex w-8 h-8 rounded-full items-center justify-center ${tones.iconBg}`}>
             <span className={`text-base ${tones.icon}`}>●</span>
           </span>
-          {/* (2) 라벨 글자 키움 */}
           <div className="text-base md:text-lg font-semibold text-[#223D8F]">{title}</div>
         </div>
-        {/* 값은 약간 줄여서 모바일 3열 맞춤 */}
         <div className="mt-1 text-2xl md:text-3xl font-extrabold text-[#1F2C5D]">{Number(value || 0)}</div>
         {sub ? <div className="text-xs text-[#223D8F] mt-1">{sub}</div> : null}
       </div>
     );
   };
 
-  // 부스명 표시
+  // 총합 카드 (한 개 카드에 총합 + 하단 칩 요약)
+  const TotalCard = ({ total, earn, redeem }) => (
+    <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex w-9 h-9 rounded-full items-center justify-center bg-[#8F8AE6]/10">
+          <span className="text-lg text-[#8F8AE6]">●</span>
+        </span>
+        <div className="text-lg font-semibold text-[#223D8F]">총 마음포인트</div>
+      </div>
+      <div className="mt-2 text-4xl font-extrabold text-[#1F2C5D]">{Number(total || 0)}</div>
+      <div className="text-xs text-[#64748B] mt-1">(적립 + 교환)</div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#27A36D]/10 text-[#1F2C5D]">
+          <span className="w-2 h-2 rounded-full bg-[#27A36D]" />
+          적립 {Number(earn || 0)}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#2843D1]/10 text-[#1F2C5D]">
+          <span className="w-2 h-2 rounded-full bg-[#2843D1]" />
+          교환 {Number(redeem || 0)}
+        </span>
+      </div>
+    </div>
+  );
+
+  // 최근활동 아이템
   const ActivityItem = ({ a }) => {
     const boothName = a?.booths?.name ?? a?.booth_name ?? a?.booth_id;
     const d = new Date(a.created_at);
     const when = isNaN(+d)
       ? ""
-      : d.toLocaleString("ko-KR", {
-          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
-        });
+      : d.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
     const kindLabel = a.kind === "redeem" ? "교환" : "적립";
+
     return (
       <li className="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-[#2843D1]/5 transition">
         <div className="text-sm">
@@ -124,30 +162,28 @@ export default function MyPage() {
     );
   };
 
-  const logout = async () => {
-    await fetch("/api/logout", { method: "POST" });
-    location.href = "/login";
-  };
-
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
       {/* 상단 인사 & 액션 */}
       <div className="max-w-3xl mx-auto px-6 pt-7 pb-2 flex items-center justify-between">
-        <h1 className="text-[28px] font-extrabold tracking-tight">
-          마을시간은행
-        </h1>
+        <h1 className="text-[28px] font-extrabold tracking-tight">마을시간은행</h1>
         <div className="flex gap-2">
-          <Link href="/scan" className="rounded-xl px-4 py-2 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95">
+          <Link
+            href="/scan"
+            className="rounded-xl px-4 py-2 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95"
+          >
             부스 입력
           </Link>
         </div>
       </div>
 
-      {/* (1) 요약 카드: 항상 3열 한 줄 고정 */}
-      <section className="max-w-3xl mx-auto px-6 grid grid-cols-3 gap-3 mt-2">
-        <StatCard title="적립" value={summary.byKind?.earn} tone="green" />
-        <StatCard title="교환" value={summary.byKind?.redeem} tone="blue" />
-        <StatCard title="총 마음포인트 (적립 + 교환)" value={summary.total} tone="lilac" />
+      {/* 총합 카드 (한 개) */}
+      <section className="max-w-3xl mx-auto px-6 mt-2">
+        <TotalCard
+          total={summary.total}
+          earn={summary.byKind?.earn}
+          redeem={summary.byKind?.redeem}
+        />
       </section>
 
       {/* 활동자산 레이더 */}
@@ -160,7 +196,6 @@ export default function MyPage() {
                 <PolarGrid />
                 <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
                 <PolarRadiusAxis />
-                {/* 외곽은 파랑, 채움은 연녹(디자인 톤) */}
                 <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.35} />
               </RadarChart>
             </ResponsiveContainer>
@@ -168,11 +203,11 @@ export default function MyPage() {
         </div>
       </section>
 
-      {/* (3) 최근 활동 + 더보기/접기 */}
+      {/* 최근 활동 (기본 3개 + 더보기/접기) */}
       <section className="max-w-3xl mx-auto px-6 mt-6 mb-10">
         <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-5 shadow-sm">
           <div className="font-semibold mb-2">최근 활동</div>
-          {list.length === 0 ? (
+          {(!Array.isArray(list) || list.length === 0) ? (
             <div className="text-[#94A3B8] text-sm">활동이 아직 없습니다.</div>
           ) : (
             <>
@@ -182,7 +217,7 @@ export default function MyPage() {
                 ))}
               </ul>
 
-              {list.length > VISIBLE_COUNT && (
+              {Array.isArray(list) && list.length > VISIBLE_COUNT ? (
                 <div className="mt-4 flex justify-center">
                   <button
                     onClick={() => setShowAll(v => !v)}
@@ -191,7 +226,7 @@ export default function MyPage() {
                     {showAll ? "접기" : "전체 보기"}
                   </button>
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>
