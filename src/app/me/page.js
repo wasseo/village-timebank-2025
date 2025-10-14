@@ -18,6 +18,10 @@ export default function MyPage() {
   const [list, setList] = useState([]);
   const [userName, setUserName] = useState("");
 
+  // (3) 최근활동 더보기 토글 상태
+  const [showAll, setShowAll] = useState(false);
+  const VISIBLE_COUNT = 6;
+
   useEffect(() => {
     (async () => {
       try {
@@ -82,14 +86,16 @@ export default function MyPage() {
     }[tone];
 
     return (
-      <div className={`rounded-2xl bg-white ring-1 ${tones.ring} p-4 shadow-sm`}>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex w-9 h-9 rounded-full items-center justify-center ${tones.iconBg}`}>
-            <span className={`text-lg ${tones.icon}`}>●</span>
+      <div className={`rounded-2xl bg-white ring-1 ${tones.ring} p-3 md:p-4 shadow-sm`}>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex w-8 h-8 rounded-full items-center justify-center ${tones.iconBg}`}>
+            <span className={`text-base ${tones.icon}`}>●</span>
           </span>
-          <div className="text-sm text-[#64748B]">{title}</div>
+          {/* (2) 라벨 글자 키움 */}
+          <div className="text-base md:text-lg font-semibold text-[#223D8F]">{title}</div>
         </div>
-        <div className="mt-2 text-3xl font-extrabold text-[#1F2C5D]">{Number(value || 0)}</div>
+        {/* 값은 약간 줄여서 모바일 3열 맞춤 */}
+        <div className="mt-1 text-2xl md:text-3xl font-extrabold text-[#1F2C5D]">{Number(value || 0)}</div>
         {sub ? <div className="text-xs text-[#223D8F] mt-1">{sub}</div> : null}
       </div>
     );
@@ -128,20 +134,17 @@ export default function MyPage() {
       {/* 상단 인사 & 액션 */}
       <div className="max-w-3xl mx-auto px-6 pt-7 pb-2 flex items-center justify-between">
         <h1 className="text-[28px] font-extrabold tracking-tight">
-          안녕하세요{userName ? `, ${userName}님` : "!"}
+          마을시간은행
         </h1>
         <div className="flex gap-2">
           <Link href="/scan" className="rounded-xl px-4 py-2 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95">
             부스 입력
           </Link>
-          <button onClick={logout} className="rounded-xl px-4 py-2 bg-white ring-1 ring-[#2843D1]/30 shadow-sm hover:bg-[#2843D1]/5">
-            로그아웃
-          </button>
         </div>
       </div>
 
-      {/* 요약 카드 */}
-      <section className="max-w-3xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+      {/* (1) 요약 카드: 항상 3열 한 줄 고정 */}
+      <section className="max-w-3xl mx-auto px-6 grid grid-cols-3 gap-3 mt-2">
         <StatCard title="적립" value={summary.byKind?.earn} tone="green" />
         <StatCard title="교환" value={summary.byKind?.redeem} tone="blue" />
         <StatCard title="총 마음포인트 (적립 + 교환)" value={summary.total} tone="lilac" />
@@ -165,16 +168,31 @@ export default function MyPage() {
         </div>
       </section>
 
-      {/* 최근 활동 */}
+      {/* (3) 최근 활동 + 더보기/접기 */}
       <section className="max-w-3xl mx-auto px-6 mt-6 mb-10">
         <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-5 shadow-sm">
           <div className="font-semibold mb-2">최근 활동</div>
           {list.length === 0 ? (
             <div className="text-[#94A3B8] text-sm">활동이 아직 없습니다.</div>
           ) : (
-            <ul className="divide-y divide-[#E2E8F0]">
-              {list.map((a) => <ActivityItem key={a.id} a={a} />)}
-            </ul>
+            <>
+              <ul className="divide-y divide-[#E2E8F0]">
+                {(showAll ? list : list.slice(0, VISIBLE_COUNT)).map((a) => (
+                  <ActivityItem key={a.id} a={a} />
+                ))}
+              </ul>
+
+              {list.length > VISIBLE_COUNT && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={() => setShowAll(v => !v)}
+                    className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] font-semibold hover:bg-[#2843D1]/5"
+                  >
+                    {showAll ? "접기" : "전체 보기"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
