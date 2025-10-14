@@ -171,9 +171,6 @@ export default function AdminDashboardPage() {
           )}
         </div>
       </div>
-
-      {/* 보조 라벨 */}
-      <div className="text-xs text-[#64748B] mt-2">(적립 + 교환)</div>
     </div>
   );
 
