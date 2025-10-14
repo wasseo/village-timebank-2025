@@ -28,7 +28,7 @@ export default function MyPage() {
   const [firstPage, setFirstPage] = useState({ list: [], nextCursor: null, hasMore: true });
 
   // 표시 개수 제어: 최초 3개, 이후 10개씩 증가
-  const INITIAL_VISIBLE = 3;
+  const INITIAL_VISIBLE = 2;
   const STEP = 10;
   const INITIAL_LIMIT = 10; // 서버 최초 로드도 10개 받아 두고 3개만 보여줌
 
@@ -156,49 +156,49 @@ export default function MyPage() {
         <div className="text-5xl md:text-6xl font-black text-[#1F2C5D] leading-none">
           {Number(total || 0)}
         </div>
+{/* 칩 UI (파랑/초록 + halo 버전) */}
+  <div className="flex flex-wrap items-center gap-3">
+    {/* 적립(파랑) */}
+    <span
+      className="relative z-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full overflow-visible"
+      style={{ backgroundColor: "rgba(40,67,209,0.10)" }} // #2843D1 10%
+    >
+      {/* halo */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full -z-10"
+        style={{ boxShadow: "0 0 24px 8px rgba(40,67,209,0.30)" }}
+      />
+      {/* dot */}
+      <span
+        className="relative z-10 w-2.5 h-2.5 rounded-full"
+        style={{ backgroundColor: "#2843D1", boxShadow: "0 0 0 3px rgba(40,67,209,0.15)" }}
+      />
+      <span className="text-[#1F2C5D] font-medium">적립</span>
+      <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
+    </span>
 
-        {/* 칩 UI */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* 적립(이전 네이비 + halo) */}
-          <span
-            className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ backgroundColor: "rgba(34, 61, 143, 0.10)" }} // #223D8F 10%
-          >
-            {/* halo */}
-            <span
-              className="absolute left-2 w-5 h-5 rounded-full opacity-30 blur-md"
-              style={{ backgroundColor: "#223D8F" }}
-              aria-hidden
-            />
-            {/* core dot */}
-            <span
-              className="relative w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#223D8F" }}
-            />
-            <span className="text-[#1F2C5D] font-medium">적립</span>
-            <span className="text-[#1F2C5D] font-semibold">{Number(earn || 0)}</span>
-          </span>
+    {/* 교환(초록) */}
+    <span
+      className="relative z-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full overflow-visible"
+      style={{ backgroundColor: "rgba(39,163,109,0.10)" }} // #27A36D 10%
+    >
+      {/* halo */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full -z-10"
+        style={{ boxShadow: "0 0 24px 8px rgba(39,163,109,0.30)" }}
+      />
+      {/* dot */}
+      <span
+        className="relative z-10 w-2.5 h-2.5 rounded-full"
+        style={{ backgroundColor: "#27A36D", boxShadow: "0 0 0 3px rgba(39,163,109,0.15)" }}
+      />
+      <span className="text-[#1F2C5D] font-medium">교환</span>
+      <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
+    </span>
+  </div>
 
-          {/* 교환(이전 오렌지 + halo) */}
-          <span
-            className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{ backgroundColor: "rgba(249, 115, 22, 0.15)" }} // #F97316 15%
-          >
-            {/* halo */}
-            <span
-              className="absolute left-2 w-5 h-5 rounded-full opacity-30 blur-md"
-              style={{ backgroundColor: "#F97316" }}
-              aria-hidden
-            />
-            {/* core dot */}
-            <span
-              className="relative w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: "#F97316" }}
-            />
-            <span className="text-[#1F2C5D] font-medium">교환</span>
-            <span className="text-[#1F2C5D] font-semibold">{Number(redeem || 0)}</span>
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -343,7 +343,7 @@ export default function MyPage() {
                     disabled={loadingMore}
                     className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] font-semibold hover:bg-[#2843D1]/5"
                   >
-                    {loadingMore ? "불러오는 중…" : "더 보기 (10개)"}
+                    {loadingMore ? "불러오는 중…" : "더 보기 "}
                   </button>
                 ) : (
                   <button
