@@ -23,8 +23,8 @@ export default function MyPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [firstPage, setFirstPage] = useState({ list: [], nextCursor: null, hasMore: true });
 
-  // 표시 개수: 최초 3개, 이후 10개씩 증가
-  const INITIAL_VISIBLE = 3;
+  // 표시 개수: 최초 2개, 이후 10개씩 증가
+  const INITIAL_VISIBLE = 2;
   const STEP = 10;
   const INITIAL_LIMIT = 10;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -82,59 +82,83 @@ export default function MyPage() {
   const fmtPlus = (n) => `+${Number(n || 0)}`;
 
 // 총합 (마음포인트: 박스 없음 / 적립·교환: 컬러 박스, 2:1:1 레이아웃)
-const TotalCard = ({ total, earn, redeem }) => (
-  // 바깥 큰 흰 박스
-  <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
-    <div className="grid grid-cols-4 gap-3 items-stretch">
-      {/* 💜 마음포인트: 내부 박스 없이 콘텐츠만 (col-span-2) */}
-      <div className="col-span-2 flex flex-col items-center justify-center min-h-[96px]">
-        <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#223D8F]">
-          {/* dot + halo */}
-          <span className="relative inline-flex w-4 h-4 items-center justify-center">
-            <span
-              aria-hidden
-              className="absolute inset-0 rounded-full opacity-50 blur-sm"
-              style={{ backgroundColor: "#8F8AE6" }}
-            />
-            <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#8F8AE6" }} />
-          </span>
-          마음포인트
+const TotalCard = ({ total, earn, redeem }) => {
+  return (
+    <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
+      <div className="grid grid-cols-4 gap-3 items-stretch">
+        {/* 💜 마음포인트: 내부 박스 없이 콘텐츠만 (col-span-2) */}
+        <div className="col-span-2 flex flex-col items-center justify-center min-h-[96px]">
+          <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#223D8F]">
+            {/* dot + halo */}
+            <span className="relative inline-flex w-4 h-4 items-center justify-center">
+              <span
+                aria-hidden
+                className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                style={{ backgroundColor: "#8F8AE6" }}
+              />
+              <span
+                className="relative w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#8F8AE6" }}
+              />
+            </span>
+            마음포인트
+          </div>
+          <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
+            {Number(total || 0)}
+          </div>
         </div>
-        <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
-          {Number(total || 0)}
-        </div>
-      </div>
 
-      {/* 💙 적립: 컬러 박스 */}
-      <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-4 flex flex-col items-center justify-center min-h-[96px]">
-        <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#2843D1]">
-          <span className="relative inline-flex w-4 h-4 items-center justify-center">
-            <span aria-hidden className="absolute inset-0 rounded-full opacity-50 blur-sm" style={{ backgroundColor: "#2843D1" }} />
-            <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
-          </span>
-          적립
+        {/* 💙 적립 (가운데 한 줄 정렬) */}
+        <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-3 flex items-center justify-center min-h-[88px]">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            {/* 라벨 */}
+            <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#2843D1]">
+              <span className="relative inline-flex w-4 h-4 items-center justify-center">
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                  style={{ backgroundColor: "#2843D1" }}
+                />
+                <span
+                  className="relative w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: "#2843D1" }}
+                />
+              </span>
+              적립
+            </span>
+            {/* 숫자 */}
+            <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
+              {Number(earn || 0)}
+            </span>
+          </div>
         </div>
-        <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
-          {Number(earn || 0)}
-        </div>
-      </div>
 
-      {/* 💚 교환: 컬러 박스 */}
-      <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-4 flex flex-col items-center justify-center min-h-[96px]">
-        <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#27A36D]">
-          <span className="relative inline-flex w-4 h-4 items-center justify-center">
-            <span aria-hidden className="absolute inset-0 rounded-full opacity-50 blur-sm" style={{ backgroundColor: "#27A36D" }} />
-            <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#27A36D" }} />
-          </span>
-          교환
-        </div>
-        <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
-          {Number(redeem || 0)}
+        {/* 💚 교환 (가운데 한 줄 정렬) */}
+        <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-3 flex items-center justify-center min-h-[88px]">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#27A36D]">
+              <span className="relative inline-flex w-4 h-4 items-center justify-center">
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                  style={{ backgroundColor: "#27A36D" }}
+                />
+                <span
+                  className="relative w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: "#27A36D" }}
+                />
+              </span>
+              교환
+            </span>
+            <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
+              {Number(redeem || 0)}
+            </span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 
   // 최근활동 아이템 (왼쪽: 부스명만 / 오른쪽: 종류 +1, 칩 색상과 동일, 볼드)
