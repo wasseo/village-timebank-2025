@@ -110,7 +110,7 @@ const TotalCard = ({ total, earn, redeem }) => {
 
         {/* 💙 적립 (가운데 한 줄 정렬) */}
         <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-3 flex items-center justify-center min-h-[88px]">
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <div className="flex flex-col items-center justify-center text-center">
             {/* 라벨 */}
             <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#2843D1]">
               <span className="relative inline-flex w-4 h-4 items-center justify-center">
@@ -135,7 +135,7 @@ const TotalCard = ({ total, earn, redeem }) => {
 
         {/* 💚 교환 (가운데 한 줄 정렬) */}
         <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-3 flex items-center justify-center min-h-[88px]">
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <div className="flex flex-col items-center justify-center text-center">
             <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#27A36D]">
               <span className="relative inline-flex w-4 h-4 items-center justify-center">
                 <span
