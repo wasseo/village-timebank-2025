@@ -230,7 +230,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="text-2xl md:text-3xl font-extrabold text-[#1F2C5D] leading-tight">
             <span className="m-4">
-              {Number(earn || 0)}
+              {Number(redeem || 0)}
             </span>       
           </div>
         </div>
