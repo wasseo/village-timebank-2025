@@ -194,7 +194,7 @@ export default function AdminDashboardPage() {
 
   // ---- 렌더 ----
   return (
-    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
+    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] pt-12 md:pt-16">
       {loading ? (
         <div className="p-6">불러오는 중…</div>
       ) : err ? (
