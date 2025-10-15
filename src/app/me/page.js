@@ -196,8 +196,12 @@ export default function MyPage() {
               </ul>
               <div className="mt-3 flex justify-center">
                 {!allVisible ? (
-                  <button onClick={showMore} disabled={loadingMore}
-                    className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] font-semibold hover:bg-[#2843D1]/5">
+                  <button
+                    onClick={showMore}
+                    disabled={loadingMore}
+                    className="px-3 py-1.5 rounded-lg bg-white ring-1 ring-[#2843D1]/30 
+                       text-[#2843D1] text-sm font-semibold hover:bg-[#2843D1]/5"
+                  >
                     {loadingMore ? "불러오는 중…" : "더 보기"}
                   </button>
                 ) : (
