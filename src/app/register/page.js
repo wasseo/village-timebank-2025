@@ -59,7 +59,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block mb-1 font-medium">주소 *</label>
+            <label className="block mb-1 font-medium">활동 시군명 *</label>
             <input
               className="w-full p-3 rounded-xl border border-[#A1E1A4] placeholder-[#7FB68A] focus:ring-2 focus:ring-[#2843D1] focus:outline-none"
               placeholder="활동 시군명을 입력하세요"
