@@ -1,3 +1,5 @@
+// /src/app/admin/onboard/page.js
+
 "use client";
 
 import { useState } from 'react';
@@ -10,6 +12,9 @@ export default function AdminOnboardPage() {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
 
+    // 🔑 [수정] 폼 제출 함수 바깥에서 정규화된 값을 계산하여 disabled 속성에서 사용 가능하도록 함
+    const normalizedPhone = phone.replace(/[^0-9]/g, '');
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
@@ -17,8 +22,7 @@ export default function AdminOnboardPage() {
         setSuccessMessage(null);
         setLoading(true);
 
-        // 1. 입력값 정리 및 기본 검증
-        const normalizedPhone = phone.replace(/[^0-9]/g, '');
+        // 1. 입력값 검증 (normalizedPhone은 이미 위에서 계산됨)
         if (normalizedPhone.length < 10) {
             setError("유효한 핸드폰 번호(10자리 이상)를 입력해주세요.");
             setLoading(false);
@@ -93,6 +97,7 @@ export default function AdminOnboardPage() {
                 
                 <button
                     type="submit"
+                    // 🔑 [수정 반영] normalizedPhone이 밖에서 정의되었으므로 여기서 사용 가능
                     disabled={loading || normalizedPhone.length < 10}
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
