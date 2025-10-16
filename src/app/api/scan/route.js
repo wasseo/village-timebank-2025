@@ -16,10 +16,10 @@ const admin = createClient(
 const RECENT_DUP_SECONDS = 60; // 동일 부스 최근 중복 방지 시간 60(초)
 const isDev = process.env.NODE_ENV !== "production";
 
-// 🔧 kind별 쿨다운 (분)
-const COOLDOWN_MINUTES = {
-  earn: 50,
-  redeem: 10,
+// 🔧 [수정] 부스별 쿨다운 (분)
+const COOLDOWN_MINUTES_BY_BOOTH = {
+  earn: 30,
+  redeem: 50,
 };
 
 /** URL/문자열 정규화: 어떤 형태로 와도 booth_id/code를 최대한 뽑아낸다 */
@@ -38,10 +38,10 @@ function normalizeScanInput({ booth_id_param, code_param }) {
       const u = new URL(out.code);
 
       // 쿼리 우선
-      const qpCode  = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
+      const qpCode = (u.searchParams.get("code") || u.searchParams.get("c") || "").trim();
       const qpBooth = (u.searchParams.get("b") || u.searchParams.get("booth_id") || "").trim();
       if (qpBooth) return { b: qpBooth, code: "" };
-      if (qpCode)  return { b: "", code: qpCode };
+      if (qpCode) return { b: "", code: qpCode };
 
       // path 패턴
       const mScan = u.pathname.match(/\/(scan|s)\/([A-Za-z0-9\-_.~]+)/);
@@ -71,14 +71,14 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
 
     // 입력 파라미터 수집
-    const booth_id_param  = (body?.b || body?.booth_id || "").trim();
-    const code_param      = (body?.code || body?.c || "").trim();
+    const booth_id_param = (body?.b || body?.booth_id || "").trim();
+    const code_param = (body?.code || body?.c || "").trim();
     const client_event_id = body?.client_event_id ?? body?.e ?? null;
 
     // ✅ 정규화
     const norm = normalizeScanInput({ booth_id_param, code_param });
     const boothIdForQuery = norm.b;
-    const codeForQuery    = norm.code;
+    const codeForQuery = norm.code;
 
     if (!boothIdForQuery && !codeForQuery) {
       return NextResponse.json(
@@ -122,39 +122,46 @@ export async function POST(req) {
     }
 
     const amount = Number(boothRow.amount || 0);
-    const kind   = boothRow.kind === "redeem" ? "redeem" : "earn";
+    const kind = boothRow.kind === "redeem" ? "redeem" : "earn";
 
-    // 🔒 (A) kind 전역 쿨다운 검증: 최근 동일 kind 활동과의 시간 차이
-    //  - earn: 50분 / redeem: 10분
-    const cooldownMin = COOLDOWN_MINUTES[kind] ?? 0;
+    // --- ▼▼▼ 쿨다운 로직 수정 ▼▼▼ ---
+
+    // 🔒 (A) 부스별 쿨다운 검증: 최근 동일 부스 & 동일 kind 활동과의 시간 차이
+    const cooldownMin = COOLDOWN_MINUTES_BY_BOOTH[kind] ?? 0;
     if (cooldownMin > 0) {
-      const { data: lastKind, error: lastKindErr } = await admin
+      const { data: lastActivityAtBooth, error: lastActivityErr } = await admin
         .from("activities")
         .select("created_at")
         .eq("user_id", session.user.id)
+        .eq("booth_id", boothRow.id) // ✨ [핵심] booth_id 조건을 추가
         .eq("kind", kind)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (lastKindErr) throw lastKindErr;
+      if (lastActivityErr) throw lastActivityErr;
 
-      if (lastKind?.created_at) {
-        const diffMin = (Date.now() - new Date(lastKind.created_at).getTime()) / 60000;
+      if (lastActivityAtBooth?.created_at) {
+        const diffMin = (Date.now() - new Date(lastActivityAtBooth.created_at).getTime()) / 60000;
         if (diffMin < cooldownMin) {
           const remain = Math.max(1, Math.ceil(cooldownMin - diffMin));
           return NextResponse.json(
             {
               ok: false,
-              error: `${kind === "earn" ? "적립" : "교환"}은 ${cooldownMin}분 간격으로 이용 가능합니다. 약 ${remain}분 후에 다시 시도해 주세요.`,
-              meta: isDev ? { last: lastKind.created_at, diffMin, cooldownMin } : undefined,
+              // ✨ [핵심] 오류 메시지를 부스별 제한으로 수정
+              error: `해당 부스에서는 ${
+                kind === "earn" ? "적립" : "교환"
+              } 후 ${cooldownMin}분 뒤에 다시 이용할 수 있습니다. 약 ${remain}분 후에 시도해 주세요.`,
+              meta: isDev ? { last: lastActivityAtBooth.created_at, diffMin, cooldownMin } : undefined,
             },
             { status: 429, headers: res.headers }
           );
         }
       }
     }
+    
+    // --- ▲▲▲ 쿨다운 로직 수정 ▲▲▲ ---
 
-    // 2) 최근 중복 방지 (동일 부스에 연속 스캔, 20초)
+    // 2) 최근 중복 방지 (동일 부스에 연속 스캔, 60초)
     const sinceIso = new Date(Date.now() - RECENT_DUP_SECONDS * 1000).toISOString();
     const { data: recentDup, error: dupErr } = await admin
       .from("activities")
