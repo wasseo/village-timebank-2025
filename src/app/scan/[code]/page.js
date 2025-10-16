@@ -1,4 +1,3 @@
-// app/scan/[code]/page.js
 "use client";
 import { useEffect, useState } from "react";
 import { enqueueScan, flushScanQueue } from "@/lib/scanQueue";
@@ -10,22 +9,38 @@ export default function ScanByPathPage({ params }) {
   useEffect(() => {
     (async () => {
       try {
-        // 0) 들어오자마자 이전에 쌓인 큐도 한 번 밀어줌
         flushScanQueue().catch(() => {});
 
-        // 1) 로그인 확인
-        const me = await fetch("/api/me").then(r => r.json()).catch(() => null);
-        const userId = me?.user?.id;
-        if (!userId) {
-          const next = encodeURIComponent(window.location.pathname);
-          location.href = `/login?next=${next}`;
+        const here = window.location.pathname + window.location.search;
+        const next = encodeURIComponent(here);
+
+        const me = await fetch("/api/me", { credentials: "include" })
+          .then(r => r.json())
+          .catch(() => null);
+
+        const isLoggedIn = !!me?.user?.id;
+        const isProfileComplete = me?.profileComplete ?? true;
+
+        // ✅ 미로그인 → 메인페이지
+        if (!isLoggedIn) {
+          location.href = "/";
           return;
         }
 
-        // 2) 이벤트 ID 생성(멱등키)
-        const eventId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`;
+        // ✅ 로그인했지만 프로필 미완 → 가입페이지
+        if (!isProfileComplete) {
+          location.href = `/register?next=${next}`;
+          return;
+        }
 
-        // 3) 온라인이면 즉시 전송, 아니면 큐에 적재
+        // -----------------------------
+        // 로그인 + 프로필 완료된 경우
+        // -----------------------------
+
+        const eventId = crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}_${Math.random()}`;
+
         if (!navigator.onLine) {
           enqueueScan({ code, client_event_id: eventId });
           setMsg("오프라인 상태입니다. 연결되면 자동으로 등록돼요. /me로 이동합니다…");
@@ -48,13 +63,11 @@ export default function ScanByPathPage({ params }) {
           );
           setTimeout(() => (location.href = "/me"), 900);
         } else {
-          // 서버에서 실패한 경우: 큐에 넣고 나중에 재시도
           enqueueScan({ code, client_event_id: eventId });
           setMsg("일시적인 오류로 저장해두었어요. 연결되면 자동으로 등록됩니다. /me로 이동합니다…");
           setTimeout(() => (location.href = "/me"), 1200);
         }
       } catch (e) {
-        // 예외 발생 시에도 큐에 넣어 안전하게
         const eventId = `${Date.now()}_${Math.random()}`;
         enqueueScan({ code, client_event_id: eventId });
         console.error(e);
@@ -71,4 +84,3 @@ export default function ScanByPathPage({ params }) {
     </main>
   );
 }
-
