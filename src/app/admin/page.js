@@ -7,37 +7,66 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from "recharts";
 
+// 🔑 [신규] 운영진 권한 확인 함수 (재사용)
+async function checkAdminAccess(pathname) {
+    const nextUrl = encodeURIComponent(pathname);
+    
+    try {
+        // 1. 로그인 상태 확인 (Middleware가 처리하지만 안전을 위해)
+        const meRes = await fetch("/api/me");
+        const me = await meRes.json().catch(() => null);
+        
+        if (!me?.user?.id) {
+            location.href = `/login?next=${nextUrl}`;
+            return false;
+        }
+
+        // 2. 운영진 권한 확인 API 호출
+        const authRes = await fetch("/api/auth/check-admin");
+        const authCheck = await authRes.json();
+
+        if (authRes.status !== 200 || !authCheck.is_admin) {
+            // 권한이 없으면 접근 거부 에러 메시지 설정
+            return { hasAccess: false, error: "운영진 권한이 없습니다." };
+        }
+
+        return { hasAccess: true, error: "" };
+
+    } catch (e) {
+        // 네트워크 오류 등 발생 시 로그인 페이지로
+        location.href = `/login?next=${nextUrl}`;
+        return { hasAccess: false, error: "인증 확인 중 오류 발생" };
+    }
+}
+
+
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
+  // 🔑 [신규] 권한 상태 관리
+  const [hasAccess, setHasAccess] = useState(false); 
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [range, setRange] = useState("day1");
   const [seriesMode, setSeriesMode] = useState("hour");
 
-  // ---- 공용 ----
-  const fetchMetrics = async (curRange) => {
-    const j = await fetch(`/api/admin/metrics?range=${curRange}`).then(r => r.json());
-    if (!j.ok) throw new Error(j.error || "metrics failed");
-    return j;
-  };
-
+  // ---- 권한 및 초기 데이터 로드 ----
   useEffect(() => {
     (async () => {
       try {
-        const meRes = await fetch("/api/me").then(r => r.json()).catch(() => null);
-        if (!meRes?.user?.id) {
-          const next = encodeURIComponent("/admin");
-          location.href = `/login?next=${next}`;
-          return;
+        const currentPath = window.location.pathname;
+        const accessCheck = await checkAdminAccess(currentPath);
+
+        if (!accessCheck.hasAccess) {
+            setErr(accessCheck.error);
+            return;
         }
-        const adminCsv = (process.env.NEXT_PUBLIC_ADMIN_UIDS || "")
-          .split(",").map(s => s.trim()).filter(Boolean);
-        if (adminCsv.length && !adminCsv.includes(meRes.user.id)) {
-          setErr("접근 권한이 없습니다."); setLoading(false); return;
-        }
+        setHasAccess(true); // 권한 통과
+
+        // 🔑 [수정] 권한 확인 코드가 깔끔해졌습니다.
         const j = await fetchMetrics(range);
         console.log("metrics response:", j);
         setData(j);
+
       } catch (e) {
         setErr(e.message || "오류가 발생했습니다.");
       } finally {
@@ -46,14 +75,26 @@ export default function AdminDashboardPage() {
     })();
   }, [range]);
 
+  // ---- 주기적 데이터 업데이트 (기존 유지) ----
   useEffect(() => {
+    // 권한이 있을 때만 타이머를 실행합니다.
+    if (!hasAccess) return; 
+
     const itv = setInterval(async () => {
       try { setData(await fetchMetrics(range)); } catch {}
     }, 60_000);
     return () => clearInterval(itv);
-  }, [range]);
+  }, [range, hasAccess]); // hasAccess 의존성 추가
 
-  // ---- 데이터 ----
+  // ---- 공용 함수 (기존 유지) ----
+  const fetchMetrics = async (curRange) => {
+    const j = await fetch(`/api/admin/metrics?range=${curRange}`).then(r => r.json());
+    if (!j.ok) throw new Error(j.error || "metrics failed");
+    return j;
+  };
+
+
+  // ---- 데이터 파싱 및 가공 로직 (기존 유지) ----
   const {
     totalSum = 0,
     timeSeries = [],
@@ -70,7 +111,7 @@ export default function AdminDashboardPage() {
   } = data || {};
 
   // 칩 값 폴백
-  const earnVal   = (typeof totalEarnSum   === "number" ? totalEarnSum   : byKind.earn)   ?? 0;
+  const earnVal   = (typeof totalEarnSum   === "number" ? totalEarnSum   : byKind.earn)   ?? 0;
   const redeemVal = (typeof totalRedeemSum === "number" ? totalRedeemSum : byKind.redeem) ?? 0;
 
   // ---- 시간 라벨: 08:00~19:00 고정 ----
@@ -109,7 +150,7 @@ export default function AdminDashboardPage() {
   );
 
   const series = seriesMode === "hour" ? hourlyNormalized : timeSeriesNormalized;
-  const xKey   = seriesMode === "hour" ? "hourStr" : "day";
+  const xKey   = seriesMode === "hour" ? "hourStr" : "day";
 
   const KR = { environment: "환경", social: "사회", economic: "경제", mental: "정신" };
 
@@ -127,7 +168,7 @@ export default function AdminDashboardPage() {
     return d.length >= 4 ? d.slice(-4) : "-";
   };
 
-  // ---- UI ----
+  // ---- UI 컴포넌트 (기존 유지) ----
   const Card = ({ title, children }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#E2E8F0] p-5 shadow-sm h-full">
       <div className="font-semibold mb-2 text-[#1F2C5D]">{title}</div>
@@ -160,7 +201,7 @@ export default function AdminDashboardPage() {
   );
 
   // 총합 카드 (admin: 3:1:1, 라벨↔숫자 가로 정렬)
-  // 마음포인트: 내부 박스 없이(흰색), 적립/교환: 컬러 박스
+  // 마음포인트: 내부 박스 없음 / 적립·교환: 컬러 박스
   const TotalCard = ({ total, earn, redeem }) => (
     <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
       {/* 3:1:1 -> grid-cols-5 = 3 + 1 + 1 */}
@@ -206,7 +247,7 @@ export default function AdminDashboardPage() {
             적립
           </div>
           <div className="text-2xl md:text-3xl font-extrabold text-[#1F2C5D] leading-tight">
-           <span className="m-4">
+            <span className="m-4">
             {Number(earn || 0)}
             </span>
           </div>
@@ -230,8 +271,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="text-2xl md:text-3xl font-extrabold text-[#1F2C5D] leading-tight">
             <span className="m-4">
-              {Number(redeem || 0)}
-            </span>       
+            {Number(redeem || 0)}
+            </span>       
           </div>
         </div>
       </div>
@@ -242,9 +283,12 @@ export default function AdminDashboardPage() {
   return (
     <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D] pt-12 md:pt-16">
       {loading ? (
-        <div className="p-6">불러오는 중…</div>
+        <div className="p-6">운영진 권한 확인 및 데이터 불러오는 중…</div>
       ) : err ? (
         <div className="p-6 text-red-600">에러: {err}</div>
+      ) : !hasAccess ? (
+         // 🔑 [수정] 권한이 없으면 에러 메시지만 표시
+         <div className="p-6 text-red-600">접근 권한이 없습니다. (관리자에게 문의하세요)</div>
       ) : (
         <div className="mx-auto px-8 py-6" style={{ maxWidth: 1920 }}>
           {/* 헤더 */}
@@ -267,7 +311,7 @@ export default function AdminDashboardPage() {
               <button onClick={() => setSeriesMode("hour")}
                 className={`rounded-full px-3 py-1 text-base font-semibold ring-1 ${
                   seriesMode === "hour" ? "bg-[#2843D1] text-white ring-[#2843D1]"
-                                        : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"}`}>
+                                         : "text-[#2843D1] ring-[#2843D1]/50 hover:bg-[#2843D1]/10"}`}>
                 시간대별
               </button>
               <button onClick={() => setSeriesMode("day")}
