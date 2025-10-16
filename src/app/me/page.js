@@ -46,7 +46,7 @@ export default function MyPage() {
         const acts = await fetch(url).then(r => r.json());
         if (!acts?.ok) throw new Error(acts?.error || "활동을 불러오지 못했습니다.");
 
-        setSummary(acts.summary || { total:0, byKind:{earn:0,redeem:0}, byCategory:{} });
+        setSummary(acts.summary || { total: 0, byKind: { earn: 0, redeem: 0 }, byCategory: {} });
         const list = Array.isArray(acts.list) ? acts.list : [];
         setPageList(list);
         setNextCursor(acts.nextCursor || null);
@@ -71,9 +71,9 @@ export default function MyPage() {
   // 레이더 데이터
   const radarData = useMemo(() => ([
     { domain: "environment", total: summary.byCategory?.environment || 0 },
-    { domain: "social",      total: summary.byCategory?.social      || 0 },
-    { domain: "mental",      total: summary.byCategory?.mental      || 0 },
-    { domain: "economic",    total: summary.byCategory?.economic    || 0 },
+    { domain: "social", total: summary.byCategory?.social || 0 },
+    { domain: "mental", total: summary.byCategory?.mental || 0 },
+    { domain: "economic", total: summary.byCategory?.economic || 0 },
   ]), [summary.byCategory]);
 
   if (loading) return <main className="min-h-screen bg-[#FFF7E3] p-6">불러오는 중…</main>;
@@ -81,87 +81,87 @@ export default function MyPage() {
 
   const fmtPlus = (n) => `+${Number(n || 0)}`;
 
-// 총합 (마음포인트: 박스 없음 / 적립·교환: 컬러 박스, 2:1:1 레이아웃)
-const TotalCard = ({ total, earn, redeem }) => {
-  return (
-    <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
-      <div className="grid grid-cols-4 gap-3 items-stretch">
-        {/* 💜 마음포인트: 내부 박스 없이 콘텐츠만 (col-span-2) */}
-        <div className="col-span-2 flex flex-col items-center justify-center min-h-[96px]">
-          <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#223D8F]">
-            {/* dot + halo */}
-            <span className="relative inline-flex w-4 h-4 items-center justify-center">
-              <span
-                aria-hidden
-                className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                style={{ backgroundColor: "#8F8AE6" }}
-              />
-              <span
-                className="relative w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: "#8F8AE6" }}
-              />
-            </span>
-            마음포인트
-          </div>
-          <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
-            {Number(total || 0)}
-          </div>
-        </div>
-
-        {/* 💙 적립 (가운데 한 줄 정렬) */}
-        <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-3 flex items-center justify-center min-h-[88px]">
-          <div className="flex flex-col items-center justify-center text-center">
-            {/* 라벨 */}
-            <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#2843D1]">
+  // TotalCard 컴포넌트는 변경 없음
+  const TotalCard = ({ total, earn, redeem }) => {
+    return (
+      <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
+        <div className="grid grid-cols-4 gap-3 items-stretch">
+          {/* 💜 마음포인트: 내부 박스 없이 콘텐츠만 (col-span-2) */}
+          <div className="col-span-2 flex flex-col items-center justify-center min-h-[96px]">
+            <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#223D8F]">
+              {/* dot + halo */}
               <span className="relative inline-flex w-4 h-4 items-center justify-center">
                 <span
                   aria-hidden
                   className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                  style={{ backgroundColor: "#2843D1" }}
+                  style={{ backgroundColor: "#8F8AE6" }}
                 />
                 <span
                   className="relative w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: "#2843D1" }}
+                  style={{ backgroundColor: "#8F8AE6" }}
                 />
               </span>
-              적립
-            </span>
-            {/* 숫자 */}
-            <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
-              {Number(earn || 0)}
-            </span>
+              마음포인트
+            </div>
+            <div className="mt-1 text-4xl md:text-5xl font-extrabold text-[#1F2C5D] leading-tight">
+              {Number(total || 0)}
+            </div>
           </div>
-        </div>
 
-        {/* 💚 교환 (가운데 한 줄 정렬) */}
-        <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-3 flex items-center justify-center min-h-[88px]">
-          <div className="flex flex-col items-center justify-center text-center">
-            <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#27A36D]">
-              <span className="relative inline-flex w-4 h-4 items-center justify-center">
-                <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                  style={{ backgroundColor: "#27A36D" }}
-                />
-                <span
-                  className="relative w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: "#27A36D" }}
-                />
+          {/* 💙 적립 (가운데 한 줄 정렬) */}
+          <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-3 flex items-center justify-center min-h-[88px]">
+            <div className="flex flex-col items-center justify-center text-center">
+              {/* 라벨 */}
+              <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#2843D1]">
+                <span className="relative inline-flex w-4 h-4 items-center justify-center">
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                    style={{ backgroundColor: "#2843D1" }}
+                  />
+                  <span
+                    className="relative w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: "#2843D1" }}
+                  />
+                </span>
+                적립
               </span>
-              교환
-            </span>
-            <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
-              {Number(redeem || 0)}
-            </span>
+              {/* 숫자 */}
+              <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
+                {Number(earn || 0)}
+              </span>
+            </div>
+          </div>
+
+          {/* 💚 교환 (가운데 한 줄 정렬) */}
+          <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-3 flex items-center justify-center min-h-[88px]">
+            <div className="flex flex-col items-center justify-center text-center">
+              <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#27A36D]">
+                <span className="relative inline-flex w-4 h-4 items-center justify-center">
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                    style={{ backgroundColor: "#27A36D" }}
+                  />
+                  <span
+                    className="relative w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: "#27A36D" }}
+                  />
+                </span>
+                교환
+              </span>
+              <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
+                {Number(redeem || 0)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 
-  // 최근활동 아이템 (왼쪽: 부스명만 / 오른쪽: 종류 +1, 칩 색상과 동일, 볼드)
+  // ActivityItem 컴포넌트는 변경 없음
   const ActivityItem = ({ a }) => {
     const boothName = a?.booths?.name ?? a?.booth_name ?? a?.booth_id;
     const isRedeem = a.kind === "redeem";
@@ -181,40 +181,51 @@ const TotalCard = ({ total, earn, redeem }) => {
     );
   };
 
-  // 더 보기: 부족하면 fetch 후 버튼 위치로 스크롤
+  // 스크롤 위치 보정 함수 (별도로 분리)
+  const scrollToButton = () => {
+    requestAnimationFrame(() => {
+      document.getElementById("recent-acts-more")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  // '더 보기' 로직 (수정된 핵심 부분)
   const showMore = async () => {
-    // 로컬에 여유 있으면 표시만 늘리기
-    if (pageList.length >= visibleCount + STEP) {
-      setVisibleCount(c => c + STEP);
-      // 버튼 위치로 스크롤
-      requestAnimationFrame(() => {
-        document.getElementById("recent-acts-more")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-      return;
+    
+    // 1. [핵심 수정] 로컬 목록을 확장할 여유가 있는지 먼저 확인합니다.
+    if (visibleCount < pageList.length) {
+        // 로컬 목록을 다음 스텝만큼 늘리거나, 목록 끝까지 늘립니다.
+        setVisibleCount(c => Math.min(c + STEP, pageList.length));
+        scrollToButton();
+        return; 
     }
 
+    // 2. 서버 요청이 필요한지 확인 (로컬 목록이 끝났고, 더 가져올 것이 남아있는 경우)
     if (!hasMore || loadingMore) return;
+
     setLoadingMore(true);
     try {
-      const url = new URL("/api/activities", location.origin);
-      url.searchParams.set("limit", String(INITIAL_LIMIT));
-      if (nextCursor) url.searchParams.set("cursor", nextCursor);
+        const url = new URL("/api/activities", location.origin);
+        url.searchParams.set("limit", String(INITIAL_LIMIT));
+        if (nextCursor) url.searchParams.set("cursor", nextCursor);
 
-      const res = await fetch(url).then(r => r.json());
-      if (!res?.ok) throw new Error(res?.error || "더보기에 실패했습니다.");
+        const res = await fetch(url).then(r => r.json());
+        if (!res?.ok) throw new Error(res?.error || "더보기에 실패했습니다.");
 
-      setPageList(prev => [...prev, ...(res.list || [])]);
-      setNextCursor(res.nextCursor || null);
-      setHasMore(!!res.hasMore);
-      setVisibleCount(c => Math.min(c + STEP, (res.list?.length ?? 0) + pageList.length));
+        const newItems = res.list || [];
+
+        setPageList(prev => [...prev, ...newItems]);
+        setNextCursor(res.nextCursor || null);
+        setHasMore(!!res.hasMore);
+        
+        // visibleCount를 새 항목만큼 늘립니다.
+        setVisibleCount(c => c + newItems.length); 
+
     } catch (e) {
-      setErr(e.message || "오류가 발생했습니다.");
+        setErr(e.message || "오류가 발생했습니다.");
     } finally {
-      setLoadingMore(false);
-      // 버튼 위치로 스크롤(목록 증가 후에도 계속 보이게)
-      requestAnimationFrame(() => {
-        document.getElementById("recent-acts-more")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
+        setLoadingMore(false);
+        // 목록이 실제로 추가되었으므로 스크롤을 조정합니다.
+        scrollToButton();
     }
   };
 
