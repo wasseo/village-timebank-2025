@@ -81,25 +81,17 @@ export default function MyPage() {
 
   const fmtPlus = (n) => `+${Number(n || 0)}`;
 
-  // TotalCard 컴포넌트는 변경 없음
+  // TotalCard 컴포넌트
   const TotalCard = ({ total, earn, redeem }) => {
     return (
       <div className="rounded-2xl bg-white ring-1 ring-[#8F8AE6]/30 p-4 shadow-sm">
         <div className="grid grid-cols-4 gap-3 items-stretch">
-          {/* 💜 마음포인트: 내부 박스 없이 콘텐츠만 (col-span-2) */}
+          {/* 💜 마음포인트 */}
           <div className="col-span-2 flex flex-col items-center justify-center min-h-[96px]">
             <div className="flex items-center gap-2 text-sm md:text-base font-semibold text-[#223D8F]">
-              {/* dot + halo */}
               <span className="relative inline-flex w-4 h-4 items-center justify-center">
-                <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                  style={{ backgroundColor: "#8F8AE6" }}
-                />
-                <span
-                  className="relative w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: "#8F8AE6" }}
-                />
+                <span aria-hidden className="absolute inset-0 rounded-full opacity-50 blur-sm" style={{ backgroundColor: "#8F8AE6" }} />
+                <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#8F8AE6" }} />
               </span>
               마음포인트
             </div>
@@ -108,45 +100,29 @@ export default function MyPage() {
             </div>
           </div>
 
-          {/* 💙 적립 (가운데 한 줄 정렬) */}
+          {/* 💙 적립 */}
           <div className="col-span-1 rounded-xl bg-[#2843D1]/10 ring-1 ring-[#2843D1]/20 p-3 flex items-center justify-center min-h-[88px]">
             <div className="flex flex-col items-center justify-center text-center">
-              {/* 라벨 */}
               <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#2843D1]">
                 <span className="relative inline-flex w-4 h-4 items-center justify-center">
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                    style={{ backgroundColor: "#2843D1" }}
-                  />
-                  <span
-                    className="relative w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: "#2843D1" }}
-                  />
+                  <span aria-hidden className="absolute inset-0 rounded-full opacity-50 blur-sm" style={{ backgroundColor: "#2843D1" }} />
+                  <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#2843D1" }} />
                 </span>
                 적립
               </span>
-              {/* 숫자 */}
               <span className="text-3xl md:text-4xl font-extrabold text-[#1F2C5D] leading-none translate-y-[1px]">
                 {Number(earn || 0)}
               </span>
             </div>
           </div>
 
-          {/* 💚 교환 (가운데 한 줄 정렬) */}
+          {/* 💚 교환 */}
           <div className="col-span-1 rounded-xl bg-[#27A36D]/10 ring-1 ring-[#27A36D]/20 p-3 flex items-center justify-center min-h-[88px]">
             <div className="flex flex-col items-center justify-center text-center">
               <span className="inline-flex items-center gap-1 text-sm md:text-base font-semibold text-[#27A36D]">
                 <span className="relative inline-flex w-4 h-4 items-center justify-center">
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 rounded-full opacity-50 blur-sm"
-                    style={{ backgroundColor: "#27A36D" }}
-                  />
-                  <span
-                    className="relative w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: "#27A36D" }}
-                  />
+                  <span aria-hidden className="absolute inset-0 rounded-full opacity-50 blur-sm" style={{ backgroundColor: "#27A36D" }} />
+                  <span className="relative w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#27A36D" }} />
                 </span>
                 교환
               </span>
@@ -160,20 +136,16 @@ export default function MyPage() {
     );
   };
 
-
-  // ActivityItem 컴포넌트는 변경 없음
+  // ActivityItem 컴포넌트
   const ActivityItem = ({ a }) => {
     const boothName = a?.booths?.name ?? a?.booth_name ?? a?.booth_id;
     const isRedeem = a.kind === "redeem";
     const kindLabel = isRedeem ? "교환" : "적립";
-    const tone = isRedeem ? "#27A36D" : "#2843D1"; // 칩과 동일 색
+    const tone = isRedeem ? "#27A36D" : "#2843D1";
 
     return (
       <li className="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-[#2843D1]/5 transition">
-        {/* 왼쪽: 부스명만 */}
         <div className="text-sm font-medium text-[#1F2C5D]">{boothName}</div>
-
-        {/* 오른쪽: 종류 +1 (볼드, 우측정렬, 칼라) */}
         <div className="text-sm font-bold" style={{ color: tone }}>
           {kindLabel} {fmtPlus(a.amount)}
         </div>
@@ -181,55 +153,45 @@ export default function MyPage() {
     );
   };
 
-  // 스크롤 위치 보정 함수 (별도로 분리)
+  // 스크롤 보정
   const scrollToButton = () => {
     requestAnimationFrame(() => {
       document.getElementById("recent-acts-more")?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   };
 
-  // '더 보기' 로직 (수정된 핵심 부분)
+  // 더 보기
   const showMore = async () => {
-    
-    // 1. [핵심 수정] 로컬 목록을 확장할 여유가 있는지 먼저 확인합니다.
     if (visibleCount < pageList.length) {
-        // 로컬 목록을 다음 스텝만큼 늘리거나, 목록 끝까지 늘립니다.
-        setVisibleCount(c => Math.min(c + STEP, pageList.length));
-        scrollToButton();
-        return; 
+      setVisibleCount(c => Math.min(c + STEP, pageList.length));
+      scrollToButton();
+      return;
     }
-
-    // 2. 서버 요청이 필요한지 확인 (로컬 목록이 끝났고, 더 가져올 것이 남아있는 경우)
     if (!hasMore || loadingMore) return;
 
     setLoadingMore(true);
     try {
-        const url = new URL("/api/activities", location.origin);
-        url.searchParams.set("limit", String(INITIAL_LIMIT));
-        if (nextCursor) url.searchParams.set("cursor", nextCursor);
+      const url = new URL("/api/activities", location.origin);
+      url.searchParams.set("limit", String(INITIAL_LIMIT));
+      if (nextCursor) url.searchParams.set("cursor", nextCursor);
 
-        const res = await fetch(url).then(r => r.json());
-        if (!res?.ok) throw new Error(res?.error || "더보기에 실패했습니다.");
+      const res = await fetch(url).then(r => r.json());
+      if (!res?.ok) throw new Error(res?.error || "더보기에 실패했습니다.");
 
-        const newItems = res.list || [];
-
-        setPageList(prev => [...prev, ...newItems]);
-        setNextCursor(res.nextCursor || null);
-        setHasMore(!!res.hasMore);
-        
-        // visibleCount를 새 항목만큼 늘립니다.
-        setVisibleCount(c => c + newItems.length); 
-
+      const newItems = res.list || [];
+      setPageList(prev => [...prev, ...newItems]);
+      setNextCursor(res.nextCursor || null);
+      setHasMore(!!res.hasMore);
+      setVisibleCount(c => c + newItems.length);
     } catch (e) {
-        setErr(e.message || "오류가 발생했습니다.");
+      setErr(e.message || "오류가 발생했습니다.");
     } finally {
-        setLoadingMore(false);
-        // 목록이 실제로 추가되었으므로 스크롤을 조정합니다.
-        scrollToButton();
+      setLoadingMore(false);
+      scrollToButton();
     }
   };
 
-  // 처음으로: 첫 페이지 복원 + 상단으로 스크롤
+  // 처음으로
   const backToTop = () => {
     setPageList(firstPage.list || []);
     setNextCursor(firstPage.nextCursor || null);
@@ -245,12 +207,24 @@ export default function MyPage() {
       {/* 헤더 */}
       <div className="max-w-3xl mx-auto px-6 pt-4 pb-1 flex items-center justify-between">
         <h1 className="text-[24px] font-extrabold tracking-tight">마을시간은행</h1>
-        <Link
-          href="/scan"
-          className="rounded-xl px-3 py-1.5 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95"
-        >
-          부스 입력
-        </Link>
+        <div className="flex gap-2">
+          {/* ✅ 만족도조사 버튼 (새 탭) */}
+          <Link
+            href="https://forms.gle/nQ46XcorZUsi1scE9"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl px-3 py-1.5 bg-[#27A36D] text-white font-semibold shadow-sm hover:opacity-95"
+          >
+            만족도조사
+          </Link>
+          {/* 기존 부스 입력 */}
+          <Link
+            href="/scan"
+            className="rounded-xl px-3 py-1.5 bg-[#2843D1] text-white font-semibold shadow-sm hover:opacity-95"
+          >
+            부스 입력
+          </Link>
+        </div>
       </div>
 
       {/* 총합 카드 */}
@@ -262,7 +236,7 @@ export default function MyPage() {
         />
       </section>
 
-      {/* ✅ 최근 활동 (위로 배치) */}
+      {/* ✅ 최근 활동 */}
       <section id="recent-acts" className="max-w-3xl mx-auto px-6 mt-3">
         <div className="rounded-3xl bg-white ring-1 ring-[#2843D1]/15 p-4 shadow-sm">
           <div className="font-semibold mb-2">최근 활동</div>
@@ -274,7 +248,7 @@ export default function MyPage() {
               <ul className="divide-y divide-[#E2E8F0]">
                 {visibleList.map((a) => (
                   <ActivityItem
-                    key={a.id ?? `${a.booth_id ?? 'booth'}-${a.created_at}`}
+                    key={a.id ?? `${a.booth_id ?? "booth"}-${a.created_at}`}
                     a={a}
                   />
                 ))}
@@ -286,16 +260,14 @@ export default function MyPage() {
                   <button
                     onClick={showMore}
                     disabled={loadingMore}
-                    className="px-3 py-1.5 rounded-lg bg-white ring-1 ring-[#2843D1]/30 
-                               text-[#2843D1] text-sm font-semibold hover:bg-[#2843D1]/5"
+                    className="px-3 py-1.5 rounded-lg bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] text-sm font-semibold hover:bg-[#2843D1]/5"
                   >
                     {loadingMore ? "불러오는 중…" : "더 보기"}
                   </button>
                 ) : (
                   <button
                     onClick={backToTop}
-                    className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 
-                               text-[#2843D1] font-semibold hover:bg-[#2843D1]/5"
+                    className="px-4 py-2 rounded-xl bg-white ring-1 ring-[#2843D1]/30 text-[#2843D1] font-semibold hover:bg-[#2843D1]/5"
                   >
                     처음으로
                   </button>
@@ -306,7 +278,7 @@ export default function MyPage() {
         </div>
       </section>
 
-      {/* ✅ 활동자산 (아래로 이동) */}
+      {/* ✅ 활동자산 */}
       <section className="max-w-3xl mx-auto px-6 mt-3 mb-10">
         <div className="rounded-3xl bg-white ring-1 ring-[#A1E1A4]/30 p-3 shadow-sm">
           <div className="font-semibold mb-2">활동자산</div>
