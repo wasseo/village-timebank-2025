@@ -71,10 +71,20 @@ export default function MyPage() {
   // 레이더 데이터
   const radarData = useMemo(() => ([
     { domain: "environment", total: summary.byCategory?.environment || 0 },
-    { domain: "social", total: summary.byCategory?.social || 0 },
-    { domain: "mental", total: summary.byCategory?.mental || 0 },
-    { domain: "economic", total: summary.byCategory?.economic || 0 },
+    { domain: "social",      total: summary.byCategory?.social || 0 },
+    { domain: "mental",      total: summary.byCategory?.mental || 0 },
+    { domain: "economic",    total: summary.byCategory?.economic || 0 },
   ]), [summary.byCategory]);
+
+  // ✅ 축 스케일: 최소 6, 현재 최대값의 1.6배로 자동 확장
+  const radarMaxRaw = useMemo(
+    () => Math.max(1, ...radarData.map(d => Number(d.total) || 0)),
+    [radarData]
+  );
+  const radarMax = useMemo(
+    () => Math.max(6, Math.ceil(radarMaxRaw * 1.6)),
+    [radarMaxRaw]
+  );
 
   if (loading) return <main className="min-h-screen bg-[#FFF7E3] p-6">불러오는 중…</main>;
   if (err) return <main className="min-h-screen bg-[#FFF7E3] p-6 text-red-600">에러: {err}</main>;
@@ -284,10 +294,18 @@ export default function MyPage() {
           <div className="font-semibold mb-2">활동자산</div>
           <div style={{ width: "100%", height: 220 }}>
             <ResponsiveContainer>
-              <RadarChart data={radarData}>
+              <RadarChart
+                data={radarData}
+                startAngle={90}   // 위에서 시작
+                endAngle={-270}  // 시계방향
+              >
                 <PolarGrid />
                 <PolarAngleAxis dataKey="domain" tickFormatter={(d) => KR[d] || d} />
-                <PolarRadiusAxis tick={false} />
+                <PolarRadiusAxis
+                  domain={[0, radarMax]}
+                  tickCount={6}
+                  angle={90}
+                />
                 <Radar dataKey="total" stroke="#2843D1" fill="#27A36D" fillOpacity={0.35} />
               </RadarChart>
             </ResponsiveContainer>
