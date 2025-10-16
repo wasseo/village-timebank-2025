@@ -76,13 +76,13 @@ export default function MyPage() {
     { domain: "economic",    total: summary.byCategory?.economic || 0 },
   ]), [summary.byCategory]);
 
-  // ✅ 축 스케일: 최소 6, 현재 최대값의 1.6배로 자동 확장
+  // ✅ 축 스케일: 최소 5, 현재 최대값의 1.6배로 자동 확장
   const radarMaxRaw = useMemo(
     () => Math.max(1, ...radarData.map(d => Number(d.total) || 0)),
     [radarData]
   );
   const radarMax = useMemo(
-    () => Math.max(6, Math.ceil(radarMaxRaw * 1.6)),
+    () => Math.max(5, Math.ceil(radarMaxRaw * 1.6)),
     [radarMaxRaw]
   );
 
