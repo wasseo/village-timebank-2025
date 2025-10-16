@@ -1,6 +1,12 @@
+
+///app/scan/[code]/page.js
+
 "use client";
 import { useEffect, useState } from "react";
 import { enqueueScan, flushScanQueue } from "@/lib/scanQueue";
+
+const MAIN_URL =
+  process.env.NEXT_PUBLIC_MAIN_URL || "https://village-timebank-2025.vercel.app/"; // ✅ 추가
 
 export default function ScanByPathPage({ params }) {
   const [msg, setMsg] = useState("처리 중…");
@@ -21,9 +27,9 @@ export default function ScanByPathPage({ params }) {
         const isLoggedIn = !!me?.user?.id;
         const isProfileComplete = me?.profileComplete ?? true;
 
-        // ✅ 미로그인 → 메인페이지
+        // ✅ 미로그인 → 메인페이지(요청하신 주소)
         if (!isLoggedIn) {
-          location.href = "/";
+          location.href = MAIN_URL;
           return;
         }
 
@@ -33,10 +39,7 @@ export default function ScanByPathPage({ params }) {
           return;
         }
 
-        // -----------------------------
-        // 로그인 + 프로필 완료된 경우
-        // -----------------------------
-
+        // ----- 이하 기존 로직 유지 -----
         const eventId = crypto.randomUUID
           ? crypto.randomUUID()
           : `${Date.now()}_${Math.random()}`;
@@ -57,21 +60,18 @@ export default function ScanByPathPage({ params }) {
         const j = await r.json();
 
         if (j.ok || j.duplicated) {
-          setMsg(j.duplicated
-            ? "이미 처리된 QR입니다. /me로 이동합니다…"
-            : "활동이 추가되었습니다. /me로 이동합니다…"
-          );
+          setMsg(j.duplicated ? "이미 처리된 QR입니다. /me로 이동합니다…" : "활동이 추가되었습니다. /me로 이동합니다…");
           setTimeout(() => (location.href = "/me"), 900);
         } else {
           enqueueScan({ code, client_event_id: eventId });
-          setMsg("일시적인 오류로 저장해두었어요. 연결되면 자동으로 등록됩니다. /me로 이동합니다…");
+          setMsg("일시적 오류로 저장했어요. /me로 이동합니다…");
           setTimeout(() => (location.href = "/me"), 1200);
         }
       } catch (e) {
         const eventId = `${Date.now()}_${Math.random()}`;
         enqueueScan({ code, client_event_id: eventId });
         console.error(e);
-        setMsg("네트워크 오류로 저장해두었어요. 연결되면 자동 등록됩니다. /me로 이동합니다…");
+        setMsg("네트워크 오류로 저장했어요. /me로 이동합니다…");
         setTimeout(() => (location.href = "/me"), 1200);
       }
     })();

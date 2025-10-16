@@ -8,7 +8,7 @@ export const revalidate = 0;
 export default function ScanPage() {
   return (
     <Suspense fallback={<main style={{ padding: 24 }}><p>로딩 중…</p></main>}>
-      <ScanGuardClient /> {/* ✅ 로그인/가입 가드 */}
+      <ScanGuardClient />
       <ScanRootClient />
     </Suspense>
   );
