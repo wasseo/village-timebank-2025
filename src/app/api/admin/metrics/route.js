@@ -61,10 +61,20 @@ export async function GET(request) {
     if (tErr) throw tErr;
 
     // ── 범위 필터 ───────────────────────────────────────────────────────────────
-    const actsInRange =
-      range === "day1" ? acts.filter(a => a.created_at <= DAY1_END_ISO) :
-      range === "day2" ? acts.filter(a => a.created_at >= DAY2_START_ISO) :
-      acts;
+     const actsInRange =
+     range === "day1"
+
+     // ✅ 10월 18일 하루만 집계
+       ? acts.filter(a =>
+          a.created_at >= "2025-10-18T00:00:00.000+09:00" &&
+          a.created_at <= "2025-10-18T23:59:59.999+09:00"
+        )
+
+      // ✅ 10월 19일은 기존 로직 유지
+      : range === "day2"
+        ? acts.filter(a => a.created_at >= DAY2_START_ISO)
+        : acts;
+
 
     // ── 맵/유틸 ─────────────────────────────────────────────────────────────────
     const boothName = new Map((booths || []).map(b => [b.id, b.name || b.id]));
