@@ -213,7 +213,7 @@ export default function MyPage() {
   const allVisible = visibleCount >= pageList.length && !hasMore;
 
   return (
-    <main className="min-h-screen bg-[#FFF7E3] text-[#1F2C5D]">
+    <main className="min-h-screen bg-[#7FD6FF] text-[#1F2C5D]">
       {/* 헤더 */}
       <div className="max-w-3xl mx-auto px-6 pt-4 pb-1 flex items-center justify-between">
         <h1 className="text-[24px] font-extrabold tracking-tight">마을시간은행</h1>

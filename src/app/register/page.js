@@ -34,7 +34,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FFF7E3] flex flex-col justify-center items-center px-6 text-[#1F2C5D]">
+    <main className="min-h-screen bg-[#7FD6FF] flex flex-col justify-center items-center px-6 text-[#1F2C5D]">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-md p-8 space-y-6 border border-[#E5E8DA]">
         {/* 타이틀 */}
         <div className="text-center">
@@ -42,7 +42,7 @@ export default function RegisterPage() {
             회원 정보 입력
           </h1>
           <p className="text-[#2843D1] text-sm">
-            마음시간은행에 참여할 기본 정보를 입력해주세요.
+            마을데이터 챌린지에 참여할 기본 정보를 입력해주세요.
           </p>
         </div>
 
