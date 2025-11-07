@@ -216,7 +216,7 @@ export default function MyPage() {
     <main className="min-h-screen bg-[#7FD6FF] text-[#1F2C5D]">
       {/* 헤더 */}
       <div className="max-w-3xl mx-auto px-6 pt-4 pb-1 flex items-center justify-between">
-        <h1 className="text-[24px] font-extrabold tracking-tight">마을시간은행</h1>
+        <h1 className="text-[24px] font-extrabold tracking-tight">마을데이터 챌린지</h1>
         <div className="flex gap-2">
           {/* ✅ 만족도조사 버튼 (새 탭) */}
           <Link
